@@ -7,7 +7,10 @@ import {
   SafetyCertificateOutlined,
   DollarOutlined,
   DatabaseOutlined,
+  ExperimentOutlined,
+  EditOutlined,
 } from '@ant-design/icons'
+import AiAssistant from './AiAssistant'
 
 const { Header, Sider, Content } = Layout
 const { Title, Text } = Typography
@@ -17,6 +20,9 @@ const menuItems = [
   { key: '/pipelines', icon: <ApiOutlined />, label: '数据管道' },
   { key: '/quality', icon: <SafetyCertificateOutlined />, label: '数据质量' },
   { key: '/cost', icon: <DollarOutlined />, label: '成本分析' },
+  { type: 'divider' },
+  { key: '/annotation', icon: <ExperimentOutlined />, label: 'RLHF 标注' },
+  { key: '/annotation/workspace', icon: <EditOutlined />, label: '标注工作台' },
 ]
 
 export default function AppLayout({ children }) {
@@ -73,6 +79,7 @@ export default function AppLayout({ children }) {
           {children}
         </Content>
       </Layout>
+      <AiAssistant />
     </Layout>
   )
 }

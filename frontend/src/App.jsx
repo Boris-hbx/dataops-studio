@@ -4,6 +4,8 @@ import Dashboard from './pages/Dashboard'
 import Pipelines from './pages/Pipelines'
 import QualityRules from './pages/QualityRules'
 import CostAnalysis from './pages/CostAnalysis'
+import AnnotationTasks from './pages/AnnotationTasks'
+import AnnotationWorkspace from './pages/AnnotationWorkspace'
 
 export default function App() {
   return (
@@ -14,6 +16,8 @@ export default function App() {
         <Route path="/pipelines" element={<Pipelines />} />
         <Route path="/quality" element={<QualityRules />} />
         <Route path="/cost" element={<CostAnalysis />} />
+        <Route path="/annotation" element={<AnnotationTasks />} />
+        <Route path="/annotation/workspace" element={<AnnotationWorkspace />} />
       </Routes>
     </AppLayout>
   )

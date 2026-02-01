@@ -1,0 +1,178 @@
+# RLHF / 后训练数据标注任务配置
+# task_type 取值: rlhf_ranking | dpo_pairwise | kto_binary | sft_editing | reward_scoring
+# status 取值: draft | active | paused | completed
+# priority 取值: high | medium | low
+
+annotation_tasks:
+  - id: AT-001
+    name: "GPT响应质量偏好排序"
+    description: "对同一 prompt 的多个模型响应进行偏好排序，用于 RLHF Reward Model 训练"
+    task_type: rlhf_ranking
+    model_source: "gpt-4-turbo"
+    status: active
+    priority: high
+    created_by: chen.lei
+    created_at: "2025-12-01"
+    config:
+      responses_per_sample: 4
+      ranking_criteria:
+        - helpfulness
+        - harmlessness
+        - honesty
+      require_rationale: true
+    total_samples: 500
+    assigned_annotators:
+      - zhang.wei
+      - li.ming
+      - wang.fang
+
+  - id: AT-002
+    name: "代码生成 DPO 偏好对"
+    description: "对代码生成任务构造 chosen/rejected 偏好对，用于 DPO 直接偏好优化训练"
+    task_type: dpo_pairwise
+    model_source: "deepseek-coder-v2"
+    status: active
+    priority: high
+    created_by: junjie.duan
+    created_at: "2025-12-10"
+    config:
+      languages: ["python", "java", "rust", "go"]
+      evaluation_dimensions:
+        - correctness
+        - efficiency
+        - readability
+        - security
+      require_chosen_rationale: true
+      require_rejected_rationale: true
+    total_samples: 800
+    assigned_annotators:
+      - zhang.wei
+      - zhao.yang
+      - chen.lei
+
+  - id: AT-003
+    name: "安全对齐 KTO 标注"
+    description: "对模型在安全场景下的响应做二元反馈(thumbs up/down)，用于 KTO 训练"
+    task_type: kto_binary
+    model_source: "claude-3.5-sonnet"
+    status: active
+    priority: medium
+    created_by: wang.fang
+    created_at: "2026-01-05"
+    config:
+      safety_categories:
+        - toxicity
+        - bias
+        - privacy_leak
+        - harmful_instruction
+      require_category_label: true
+      require_severity_score: true
+    total_samples: 1200
+    assigned_annotators:
+      - li.ming
+      - wang.fang
+
+  - id: AT-004
+    name: "客服对话 SFT 数据改写"
+    description: "修正和改善模型在客服场景的回复，构造高质量 SFT 微调数据"
+    task_type: sft_editing
+    model_source: "qwen-2.5-72b"
+    status: active
+    priority: medium
+    created_by: zhao.yang
+    created_at: "2026-01-12"
+    config:
+      domain: "customer_service"
+      editing_guidelines:
+        - "保持专业礼貌的语气"
+        - "回答要具体、可操作"
+        - "不编造信息"
+        - "敏感问题引导转人工"
+      min_edit_ratio: 0.1
+      max_response_length: 500
+    total_samples: 600
+    assigned_annotators:
+      - zhang.wei
+      - li.ming
+      - zhao.yang
+
+  - id: AT-005
+    name: "多轮对话 Reward Scoring"
+    description: "对多轮对话中的每个回复打分(1-10)，用于 Process Reward Model 训练"
+    task_type: reward_scoring
+    model_source: "gpt-4o"
+    status: draft
+    priority: low
+    created_by: chen.lei
+    created_at: "2026-01-20"
+    config:
+      score_range: [1, 10]
+      scoring_dimensions:
+        - coherence
+        - relevance
+        - informativeness
+        - engagement
+      require_per_turn_score: true
+      max_turns: 8
+    total_samples: 300
+    assigned_annotators: []
+
+  - id: AT-006
+    name: "数学推理 RLHF 排序"
+    description: "对数学推理问题的多步骤解答进行偏好排序，重点考察推理正确性"
+    task_type: rlhf_ranking
+    model_source: "deepseek-r1"
+    status: paused
+    priority: medium
+    created_by: junjie.duan
+    created_at: "2026-01-15"
+    config:
+      responses_per_sample: 3
+      ranking_criteria:
+        - reasoning_correctness
+        - step_clarity
+        - final_answer_accuracy
+      require_rationale: true
+      require_step_annotation: true
+    total_samples: 400
+    assigned_annotators:
+      - chen.lei
+      - zhao.yang
+
+annotators:
+  - id: zhang.wei
+    name: "张伟"
+    role: senior_annotator
+    specialties: ["general", "code", "customer_service"]
+    accuracy_rate: 0.94
+
+  - id: li.ming
+    name: "李明"
+    role: senior_annotator
+    specialties: ["general", "safety", "customer_service"]
+    accuracy_rate: 0.91
+
+  - id: wang.fang
+    name: "王芳"
+    role: annotator
+    specialties: ["general", "safety"]
+    accuracy_rate: 0.88
+
+  - id: zhao.yang
+    name: "赵阳"
+    role: annotator
+    specialties: ["code", "math"]
+    accuracy_rate: 0.90
+
+  - id: chen.lei
+    name: "陈磊"
+    role: lead_annotator
+    specialties: ["general", "code", "math", "safety"]
+    accuracy_rate: 0.96
+
+quality_config:
+  min_annotators_per_sample: 2
+  agreement_threshold: 0.7
+  spot_check_ratio: 0.15
+  auto_reject_threshold: 0.5
+  fleiss_kappa_target: 0.6
