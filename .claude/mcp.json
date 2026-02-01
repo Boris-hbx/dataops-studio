@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "dataops-studio": {
+      "command": "node",
+      "args": ["mcp-server-dataops/dist/index.js"],
+      "env": {
+        "DATAOPS_API_BASE": "http://localhost:8000"
+      }
+    }
+  }
+}

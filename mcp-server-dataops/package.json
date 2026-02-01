@@ -1,0 +1,26 @@
+{
+  "name": "mcp-server-dataops",
+  "version": "1.0.0",
+  "description": "MCP Server for DataOps Studio — query pipelines, quality, cost, lineage via Claude",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "mcp-server-dataops": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
