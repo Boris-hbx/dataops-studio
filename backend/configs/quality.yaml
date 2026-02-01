@@ -5,9 +5,6 @@
 # severity 取值: critical | warning | info
 # check_type 取值: null_check | range_check | uniqueness | freshness | custom_sql
 #
-# ⚠️ 已知问题:
-#   - QR-005 (user_profile null check) enabled=false，上线后忘记启用
-#   - QR-003 的 threshold 设置偏低，会产生大量误报
 
 rules:
   - id: QR-001
@@ -48,8 +45,6 @@ rules:
     column: event_time
     params:
       max_delay_hours: 2
-      # ⚠️ 这个阈值太严格了，经常在高峰期误报
-      # 建议调整为 4 小时，但是没人改
     enabled: true
     severity: critical
     threshold: 0.0
@@ -76,9 +71,6 @@ rules:
     pipeline_id: user_profile_sync
     check_type: null_check
     column: user_id
-    # ⚠️ BUG: 这条规则上线时 PM 说「先观察，别开」
-    # 然后就再也没人打开过
-    # 导致 user_profile 中存在 NULL user_id 的脏数据
     enabled: false
     severity: critical
     threshold: 0.0

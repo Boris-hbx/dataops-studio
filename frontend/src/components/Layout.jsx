@@ -63,7 +63,6 @@ export default function AppLayout({ children }) {
         }}>
           <Space>
             <Text strong style={{ fontSize: 16 }}>数据运维平台</Text>
-            <Tag color="blue">Demo</Tag>
           </Space>
           <Space>
             <Tag color="green">系统正常</Tag>

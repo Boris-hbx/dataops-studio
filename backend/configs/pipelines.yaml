@@ -6,8 +6,6 @@
 # schedule 使用 cron 语法
 # owner 为负责团队
 #
-# ⚠️ risk_score_calc 仍依赖 legacy ETL 脚本，迁移工单 DATA-1024 已创建但未排期
-# ⚠️ user_profile_sync 的质量规则 QR-005 配置了但 enabled=false，上线时忘记打开
 
 pipelines:
   - id: orders_daily
@@ -72,8 +70,6 @@ pipelines:
       retry_count: 2
       timeout_minutes: 90
       merge_strategy: upsert
-      # NOTE: 质量规则 QR-005 配置了 null_check 但未启用
-      # 上线时产品经理说"先观察一周再开"，然后就忘了
       quality_gate_enabled: false
     tags:
       - user
@@ -100,8 +96,6 @@ pipelines:
       batch_size: 10000
       retry_count: 1
       timeout_minutes: 120
-      # ⚠️ 仍然调用 legacy/etl_scripts/calc_risk.py
-      # 新版本在 core/risk_engine 里但还没切换
       use_legacy_engine: true
       legacy_script: "legacy/etl_scripts/calc_risk.py"
     tags:

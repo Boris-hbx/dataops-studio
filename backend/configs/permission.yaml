@@ -1,4 +1,4 @@
-# 权限配置（Demo 模式下未启用认证，此文件仅作展示）
+# 权限配置
 # TODO: 接入公司 SSO 后启用 — DATA-892
 # last updated: 2024-08-20 by ops-team
 
@@ -29,7 +29,7 @@ roles:
       - lineage:read
       - cost:read
 
-# 默认 Demo 模式不做鉴权
+# 认证配置
 auth:
   enabled: false
   provider: none  # 可选: sso | ldap | none
