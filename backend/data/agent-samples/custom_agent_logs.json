@@ -1,0 +1,65 @@
+{
+  "trace_id": "custom_session_001",
+  "timestamp": 1705752000,
+  "agent_config": {
+    "model_name": "gpt-4",
+    "temperature": 0.7
+  },
+  "conversation_turns": [
+    {
+      "speaker_type": "user",
+      "text": "查询用户ID为12345的订单列表"
+    },
+    {
+      "speaker_type": "assistant",
+      "text": "好的，我来查询该用户的订单信息",
+      "actions": [
+        {
+          "action_id": "a1",
+          "tool_name": "query_database",
+          "tool_input": {
+            "table": "orders",
+            "where": {"user_id": 12345},
+            "limit": 10
+          }
+        }
+      ]
+    },
+    {
+      "speaker_type": "tool",
+      "action_ref_id": "a1",
+      "text": "{\"orders\": [{\"order_id\": \"ORD001\", \"amount\": 299.99, \"status\": \"completed\"}, {\"order_id\": \"ORD002\", \"amount\": 159.50, \"status\": \"pending\"}]}"
+    },
+    {
+      "speaker_type": "assistant",
+      "text": "用户12345有2个订单：\n1. 订单号ORD001，金额299.99元，已完成\n2. 订单号ORD002，金额159.50元，待处理"
+    },
+    {
+      "speaker_type": "user",
+      "text": "取消订单ORD002"
+    },
+    {
+      "speaker_type": "assistant",
+      "text": "我来帮你取消这个订单",
+      "actions": [
+        {
+          "action_id": "a2",
+          "tool_name": "cancel_order",
+          "tool_input": {
+            "order_id": "ORD002",
+            "reason": "用户主动取消"
+          }
+        }
+      ]
+    },
+    {
+      "speaker_type": "tool",
+      "action_ref_id": "a2",
+      "text": "{\"success\": true, \"message\": \"订单已取消\"}"
+    },
+    {
+      "speaker_type": "assistant",
+      "text": "订单ORD002已成功取消。"
+    }
+  ]
+}

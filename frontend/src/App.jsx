@@ -1,11 +1,13 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import AppLayout from './components/Layout'
-import Dashboard from './pages/Dashboard'
-import Pipelines from './pages/Pipelines'
-import QualityRules from './pages/QualityRules'
-import CostAnalysis from './pages/CostAnalysis'
-import AnnotationTasks from './pages/AnnotationTasks'
-import AnnotationWorkspace from './pages/AnnotationWorkspace'
+import { Routes, Route, Navigate } from "react-router-dom";
+import AppLayout from "./components/Layout";
+import Dashboard from "./pages/Dashboard";
+import Pipelines from "./pages/Pipelines";
+import QualityRules from "./pages/QualityRules";
+import CostAnalysis from "./pages/CostAnalysis";
+import AnnotationTasks from "./pages/AnnotationTasks";
+import AnnotationWorkspace from "./pages/AnnotationWorkspace";
+import AgentAnnotation from "./pages/AgentAnnotation";
+import AgentAnnotationWorkspace from "./pages/AgentAnnotationWorkspace";
 
 export default function App() {
   return (
@@ -18,7 +20,12 @@ export default function App() {
         <Route path="/cost" element={<CostAnalysis />} />
         <Route path="/annotation" element={<AnnotationTasks />} />
         <Route path="/annotation/workspace" element={<AnnotationWorkspace />} />
+        <Route path="/agent-annotation" element={<AgentAnnotation />} />
+        <Route
+          path="/agent-annotation/workspace/:sessionId"
+          element={<AgentAnnotationWorkspace />}
+        />
       </Routes>
     </AppLayout>
-  )
+  );
 }

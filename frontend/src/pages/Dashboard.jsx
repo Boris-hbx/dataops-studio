@@ -1,57 +1,133 @@
-import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag, Typography, Space, Alert } from 'antd'
+import { useState, useEffect, useCallback } from "react";
 import {
-  ApiOutlined, CheckCircleOutlined, DollarOutlined,
-  WarningOutlined, ClockCircleOutlined, DatabaseOutlined,
-  ArrowUpOutlined, ArrowDownOutlined,
-} from '@ant-design/icons'
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Table,
+  Tag,
+  Typography,
+  Space,
+  Alert,
+  Button,
+  Spin,
+  message,
+} from "antd";
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
-} from 'recharts'
+  ApiOutlined,
+  CheckCircleOutlined,
+  DollarOutlined,
+  WarningOutlined,
+  ClockCircleOutlined,
+  DatabaseOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
-const { Title, Text } = Typography
+const { Title, Text } = Typography;
 
 export default function Dashboard() {
-  const [stats, setStats] = useState(null)
-  const [trend, setTrend] = useState([])
-  const [alerts, setAlerts] = useState([])
+  const [stats, setStats] = useState(null);
+  const [trend, setTrend] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [statsRes, trendRes, alertsRes] = await Promise.all([
+        fetch("/api/dashboard/stats"),
+        fetch("/api/dashboard/execution-trend"),
+        fetch("/api/dashboard/alerts?limit=10"),
+      ]);
+      setStats(await statsRes.json());
+      setTrend(await trendRes.json());
+      setAlerts(await alertsRes.json());
+    } catch {
+      message.error("刷新数据失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetch('/api/dashboard/stats').then(r => r.json()).then(setStats)
-    fetch('/api/dashboard/execution-trend').then(r => r.json()).then(setTrend)
-    fetch('/api/dashboard/alerts?limit=10').then(r => r.json()).then(setAlerts)
-  }, [])
+    fetchData();
+  }, [fetchData]);
 
-  if (!stats) return null
+  if (!stats)
+    return (
+      <Spin style={{ display: "block", margin: "120px auto" }} size="large" />
+    );
 
   const alertColumns = [
     {
-      title: '时间', dataIndex: 'time', key: 'time', width: 180,
-      render: t => t?.slice(0, 16).replace('T', ' '),
+      title: "时间",
+      dataIndex: "time",
+      key: "time",
+      width: 180,
+      render: (t) => t?.slice(0, 16).replace("T", " "),
     },
     {
-      title: '级别', dataIndex: 'severity', key: 'severity', width: 80,
-      render: s => (
-        <Tag color={s === 'critical' ? 'red' : s === 'warning' ? 'orange' : 'blue'}>
-          {s === 'critical' ? '严重' : s === 'warning' ? '警告' : '信息'}
+      title: "级别",
+      dataIndex: "severity",
+      key: "severity",
+      width: 80,
+      render: (s) => (
+        <Tag
+          color={s === "critical" ? "red" : s === "warning" ? "orange" : "blue"}
+        >
+          {s === "critical" ? "严重" : s === "warning" ? "警告" : "信息"}
         </Tag>
       ),
     },
     {
-      title: '类型', dataIndex: 'type', key: 'type', width: 100,
-      render: t => t === 'execution_failure' ? '执行失败' : '质量违规',
+      title: "类型",
+      dataIndex: "type",
+      key: "type",
+      width: 100,
+      render: (t) => (t === "execution_failure" ? "执行失败" : "质量违规"),
     },
-    { title: '详情', dataIndex: 'message', key: 'message', ellipsis: true },
+    { title: "详情", dataIndex: "message", key: "message", ellipsis: true },
     {
-      title: '状态', dataIndex: 'resolved', key: 'resolved', width: 80,
-      render: r => r ? <Tag color="green">已解决</Tag> : <Tag color="red">未解决</Tag>,
+      title: "状态",
+      dataIndex: "resolved",
+      key: "resolved",
+      width: 80,
+      render: (r) =>
+        r ? <Tag color="green">已解决</Tag> : <Tag color="red">未解决</Tag>,
     },
-  ]
+  ];
 
   return (
     <div>
-      <Title level={4} style={{ marginBottom: 24 }}>运维看板</Title>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 24,
+        }}
+      >
+        <Title level={4} style={{ margin: 0 }}>
+          运维看板
+        </Title>
+        <Button icon={<ReloadOutlined />} loading={loading} onClick={fetchData}>
+          刷新
+        </Button>
+      </div>
 
       {/* 核心指标卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -61,7 +137,7 @@ export default function Dashboard() {
               title="活跃管道"
               value={stats.active_pipelines}
               suffix={`/ ${stats.total_pipelines}`}
-              prefix={<ApiOutlined style={{ color: '#1677ff' }} />}
+              prefix={<ApiOutlined style={{ color: "#1677ff" }} />}
             />
             {stats.degraded_pipelines > 0 && (
               <Text type="warning" style={{ fontSize: 12 }}>
@@ -75,7 +151,7 @@ export default function Dashboard() {
             <Statistic
               title="今日执行次数"
               value={stats.executions_today}
-              prefix={<ClockCircleOutlined style={{ color: '#52c41a' }} />}
+              prefix={<ClockCircleOutlined style={{ color: "#52c41a" }} />}
             />
             <Text type="secondary" style={{ fontSize: 12 }}>
               30天处理 {(stats.total_rows_30d / 10000).toFixed(0)} 万行
@@ -89,17 +165,34 @@ export default function Dashboard() {
               value={stats.quality_score}
               suffix="分"
               precision={1}
-              prefix={<CheckCircleOutlined style={{
-                color: stats.quality_score >= 90 ? '#52c41a' : stats.quality_score >= 80 ? '#faad14' : '#ff4d4f'
-              }} />}
+              prefix={
+                <CheckCircleOutlined
+                  style={{
+                    color:
+                      stats.quality_score >= 90
+                        ? "#52c41a"
+                        : stats.quality_score >= 80
+                          ? "#faad14"
+                          : "#ff4d4f",
+                  }}
+                />
+              }
               valueStyle={{
-                color: stats.quality_score >= 90 ? '#52c41a' : stats.quality_score >= 80 ? '#faad14' : '#ff4d4f'
+                color:
+                  stats.quality_score >= 90
+                    ? "#52c41a"
+                    : stats.quality_score >= 80
+                      ? "#faad14"
+                      : "#ff4d4f",
               }}
             />
             <Text type="secondary" style={{ fontSize: 12 }}>
               {stats.enabled_rules}/{stats.total_quality_rules} 规则启用
               {stats.disabled_rules > 0 && (
-                <Text type="danger" style={{ fontSize: 12 }}> ({stats.disabled_rules}个未启用)</Text>
+                <Text type="danger" style={{ fontSize: 12 }}>
+                  {" "}
+                  ({stats.disabled_rules}个未启用)
+                </Text>
               )}
             </Text>
           </Card>
@@ -110,7 +203,7 @@ export default function Dashboard() {
               title="30日总成本"
               value={stats.total_cost_30d}
               precision={2}
-              prefix={<DollarOutlined style={{ color: '#722ed1' }} />}
+              prefix={<DollarOutlined style={{ color: "#722ed1" }} />}
               suffix="元"
             />
             <Text type="secondary" style={{ fontSize: 12 }}>
@@ -127,9 +220,9 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={trend}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickFormatter={d => d.slice(5)} />
+                <XAxis dataKey="date" tickFormatter={(d) => d.slice(5)} />
                 <YAxis />
-                <Tooltip labelFormatter={d => d} />
+                <Tooltip labelFormatter={(d) => d} />
                 <Legend />
                 <Bar dataKey="success" name="成功" fill="#52c41a" stackId="a" />
                 <Bar dataKey="failed" name="失败" fill="#ff4d4f" stackId="a" />
@@ -139,20 +232,51 @@ export default function Dashboard() {
         </Col>
         <Col xs={24} lg={10}>
           <Card title="管道状态分布" size="small">
-            <Row gutter={[8, 16]} style={{ padding: '20px 0' }}>
+            <Row gutter={[8, 16]} style={{ padding: "20px 0" }}>
               {[
-                { label: '运行中', value: stats.active_pipelines, color: '#52c41a', icon: <CheckCircleOutlined /> },
-                { label: '降级', value: stats.degraded_pipelines, color: '#faad14', icon: <WarningOutlined /> },
-                { label: '已暂停', value: stats.paused_pipelines, color: '#d9d9d9', icon: <ClockCircleOutlined /> },
-              ].map(item => (
-                <Col span={8} key={item.label} style={{ textAlign: 'center' }}>
-                  <div style={{
-                    width: 80, height: 80, borderRadius: '50%',
-                    background: `${item.color}20`, border: `3px solid ${item.color}`,
-                    display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px',
-                  }}>
-                    <span style={{ fontSize: 28, fontWeight: 'bold', color: item.color }}>{item.value}</span>
+                {
+                  label: "运行中",
+                  value: stats.active_pipelines,
+                  color: "#52c41a",
+                  icon: <CheckCircleOutlined />,
+                },
+                {
+                  label: "降级",
+                  value: stats.degraded_pipelines,
+                  color: "#faad14",
+                  icon: <WarningOutlined />,
+                },
+                {
+                  label: "已暂停",
+                  value: stats.paused_pipelines,
+                  color: "#d9d9d9",
+                  icon: <ClockCircleOutlined />,
+                },
+              ].map((item) => (
+                <Col span={8} key={item.label} style={{ textAlign: "center" }}>
+                  <div
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: "50%",
+                      background: `${item.color}20`,
+                      border: `3px solid ${item.color}`,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 8px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 28,
+                        fontWeight: "bold",
+                        color: item.color,
+                      }}
+                    >
+                      {item.value}
+                    </span>
                   </div>
                   <Text>{item.label}</Text>
                 </Col>
@@ -180,5 +304,5 @@ export default function Dashboard() {
         />
       </Card>
     </div>
-  )
+  );
 }

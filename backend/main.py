@@ -28,6 +28,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Agent 工具调用标注模块
+from agent_annotation import router as agent_annotation_router
+app.include_router(agent_annotation_router)
+
 # ---------------------------------------------------------------------------
 # 加载 YAML 配置
 # ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Typography, Space, Tag } from 'antd'
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Layout, Menu, Typography, Space, Tag } from "antd";
 import {
   DashboardOutlined,
   ApiOutlined,
@@ -9,45 +9,57 @@ import {
   DatabaseOutlined,
   ExperimentOutlined,
   EditOutlined,
-} from '@ant-design/icons'
-import AiAssistant from './AiAssistant'
+  RobotOutlined,
+  ToolOutlined,
+} from "@ant-design/icons";
+import AiAssistant from "./AiAssistant";
 
-const { Header, Sider, Content } = Layout
-const { Title, Text } = Typography
+const { Header, Sider, Content } = Layout;
+const { Title, Text } = Typography;
 
 const menuItems = [
-  { key: '/dashboard', icon: <DashboardOutlined />, label: '运维看板' },
-  { key: '/pipelines', icon: <ApiOutlined />, label: '数据管道' },
-  { key: '/quality', icon: <SafetyCertificateOutlined />, label: '数据质量' },
-  { key: '/cost', icon: <DollarOutlined />, label: '成本分析' },
-  { type: 'divider' },
-  { key: '/annotation', icon: <ExperimentOutlined />, label: 'RLHF 标注' },
-  { key: '/annotation/workspace', icon: <EditOutlined />, label: '标注工作台' },
-]
+  { key: "/dashboard", icon: <DashboardOutlined />, label: "运维看板" },
+  { key: "/pipelines", icon: <ApiOutlined />, label: "数据管道" },
+  { key: "/quality", icon: <SafetyCertificateOutlined />, label: "数据质量" },
+  { key: "/cost", icon: <DollarOutlined />, label: "成本分析" },
+  { type: "divider" },
+  { key: "/annotation", icon: <ExperimentOutlined />, label: "RLHF 标注" },
+  { key: "/annotation/workspace", icon: <EditOutlined />, label: "标注工作台" },
+  { type: "divider" },
+  { key: "/agent-annotation", icon: <RobotOutlined />, label: "Agent 标注" },
+];
 
 export default function AppLayout({ children }) {
-  const [collapsed, setCollapsed] = useState(false)
-  const navigate = useNavigate()
-  const location = useLocation()
+  const [collapsed, setCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: "100vh" }}>
       <Sider
         collapsible
         collapsed={collapsed}
         onCollapse={setCollapsed}
         theme="dark"
         width={220}
-        style={{ background: '#001529' }}
+        style={{ background: "#001529" }}
       >
-        <div style={{
-          height: 64, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)'
-        }}>
+        <div
+          style={{
+            height: 64,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
           <Space>
-            <DatabaseOutlined style={{ fontSize: 24, color: '#1677ff' }} />
+            <DatabaseOutlined style={{ fontSize: 24, color: "#1677ff" }} />
             {!collapsed && (
-              <Title level={4} style={{ color: '#fff', margin: 0, whiteSpace: 'nowrap' }}>
+              <Title
+                level={4}
+                style={{ color: "#fff", margin: 0, whiteSpace: "nowrap" }}
+              >
                 DataOps Studio
               </Title>
             )}
@@ -62,24 +74,30 @@ export default function AppLayout({ children }) {
         />
       </Sider>
       <Layout>
-        <Header style={{
-          background: '#fff', padding: '0 24px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          borderBottom: '1px solid #f0f0f0', height: 64,
-        }}>
+        <Header
+          style={{
+            background: "#fff",
+            padding: "0 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid #f0f0f0",
+            height: 64,
+          }}
+        >
           <Space>
-            <Text strong style={{ fontSize: 16 }}>数据运维平台</Text>
+            <Text strong style={{ fontSize: 16 }}>
+              数据运维平台
+            </Text>
           </Space>
           <Space>
             <Tag color="green">系统正常</Tag>
             <Text type="secondary">admin@dataops.io</Text>
           </Space>
         </Header>
-        <Content style={{ margin: 24, minHeight: 280 }}>
-          {children}
-        </Content>
+        <Content style={{ margin: 24, minHeight: 280 }}>{children}</Content>
       </Layout>
       <AiAssistant />
     </Layout>
-  )
+  );
 }
