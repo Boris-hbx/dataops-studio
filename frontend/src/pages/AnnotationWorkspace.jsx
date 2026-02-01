@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Card, Typography, Space, Row, Col, Tag, Radio, Button, Input, Rate,
-  Divider, Alert, Select, Descriptions, Badge, Segmented,
+  Divider, Alert, Select, Descriptions, Badge, Segmented, Progress, Statistic,
+  message,
 } from 'antd'
 import {
   SwapOutlined, LikeOutlined, DislikeOutlined, EditOutlined,
-  StarOutlined, OrderedListOutlined,
+  StarOutlined, OrderedListOutlined, ExperimentOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons'
 
 const { Title, Text, Paragraph } = Typography
@@ -19,10 +22,20 @@ const taskTypeIcons = {
   reward_scoring: <StarOutlined />,
 }
 
+const taskTypeColors = {
+  rlhf_ranking: 'blue',
+  dpo_pairwise: 'purple',
+  kto_binary: 'orange',
+  sft_editing: 'green',
+  reward_scoring: 'cyan',
+}
+
 export default function AnnotationWorkspace() {
+  const [searchParams] = useSearchParams()
   const [tasks, setTasks] = useState([])
   const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [samples, setSamples] = useState([])
+  const [sampleTotal, setSampleTotal] = useState(0)
   const [currentIdx, setCurrentIdx] = useState(0)
 
   // Annotation state
@@ -34,21 +47,43 @@ export default function AnnotationWorkspace() {
   const [rationale, setRationale] = useState('')
   const [safetyCategory, setSafetyCategory] = useState('none')
 
+  // Submit state
+  const [submitting, setSubmitting] = useState(false)
+  const [submitResult, setSubmitResult] = useState(null)
+  const startTimeRef = useRef(null)
+
+  // Load tasks + read URL param
   useEffect(() => {
     fetch('/api/annotation/tasks').then(r => r.json()).then(data => {
       setTasks(data.filter(t => t.status === 'active'))
+      const taskParam = searchParams.get('task')
+      if (taskParam) {
+        const match = data.find(t => t.id === taskParam)
+        if (match) setSelectedTaskId(taskParam)
+      }
     })
   }, [])
 
+  // Load samples when task changes
   useEffect(() => {
     if (selectedTaskId) {
       fetch(`/api/annotation/tasks/${selectedTaskId}/samples`).then(r => r.json()).then(data => {
-        setSamples(data)
-        setCurrentIdx(0)
+        const sampleList = data.samples || []
+        setSamples(sampleList)
+        setSampleTotal(data.total || sampleList.length)
+        // Jump to first unannotated sample
+        const firstUnannotated = sampleList.findIndex(s => !s.annotated)
+        setCurrentIdx(firstUnannotated >= 0 ? firstUnannotated : 0)
         resetAnnotation()
+        setSubmitResult(null)
       })
     }
   }, [selectedTaskId])
+
+  // Track start time when sample changes
+  useEffect(() => {
+    startTimeRef.current = Date.now()
+  }, [currentIdx, selectedTaskId])
 
   const resetAnnotation = () => {
     setRanking([])
@@ -58,10 +93,14 @@ export default function AnnotationWorkspace() {
     setScores({})
     setRationale('')
     setSafetyCategory('none')
+    setSubmitResult(null)
   }
 
   const selectedTask = tasks.find(t => t.id === selectedTaskId)
   const currentSample = samples[currentIdx]
+
+  // Compute completed count from samples
+  const completedCount = samples.filter(s => s.annotated).length
 
   const handleNext = () => {
     if (currentIdx < samples.length - 1) {
@@ -74,6 +113,89 @@ export default function AnnotationWorkspace() {
     if (currentIdx > 0) {
       setCurrentIdx(currentIdx - 1)
       resetAnnotation()
+    }
+  }
+
+  // Submit validation
+  const canSubmit = () => {
+    if (!selectedTask || !currentSample || currentSample.annotated) return false
+    const { task_type } = selectedTask
+    if (task_type === 'rlhf_ranking') {
+      return ranking.length === (currentSample.responses || []).length && rationale.trim().length > 0
+    }
+    if (task_type === 'dpo_pairwise') {
+      return chosenIdx !== null && rationale.trim().length > 0
+    }
+    if (task_type === 'kto_binary') {
+      return feedback !== null
+    }
+    if (task_type === 'sft_editing') {
+      return editedText.trim().length > 0
+    }
+    if (task_type === 'reward_scoring') {
+      return Object.keys(scores).length === 4 && Object.values(scores).every(v => v > 0)
+    }
+    return false
+  }
+
+  const handleSubmit = async () => {
+    if (!canSubmit()) return
+    setSubmitting(true)
+    setSubmitResult(null)
+
+    const durationSeconds = Math.round((Date.now() - (startTimeRef.current || Date.now())) / 1000)
+    const body = {
+      sample_id: currentSample.id,
+      annotator: 'zhang.wei',
+      duration_seconds: durationSeconds,
+    }
+
+    const { task_type } = selectedTask
+    if (task_type === 'rlhf_ranking') {
+      body.ranking = ranking
+      body.rationale = rationale
+    } else if (task_type === 'dpo_pairwise') {
+      body.chosen_index = chosenIdx
+      body.rationale = rationale
+    } else if (task_type === 'kto_binary') {
+      body.feedback = feedback
+      body.safety_category = safetyCategory
+      body.rationale = rationale
+    } else if (task_type === 'sft_editing') {
+      body.edited_response = editedText
+    } else if (task_type === 'reward_scoring') {
+      body.scores = scores
+    }
+
+    try {
+      const resp = await fetch(`/api/annotation/tasks/${selectedTaskId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const result = await resp.json()
+      if (result.status === 'ok') {
+        setSubmitResult({ type: 'success', message: `提交成功 (${result.submission_id})，进度: ${result.task_progress.completed}/${result.task_progress.total}` })
+        message.success('标注提交成功')
+        // Mark current sample as annotated locally
+        setSamples(prev => prev.map((s, i) => i === currentIdx ? { ...s, annotated: true } : s))
+        // Auto-advance to next unannotated after 1.5s
+        setTimeout(() => {
+          const nextUnannotated = samples.findIndex((s, i) => i > currentIdx && !s.annotated)
+          if (nextUnannotated >= 0) {
+            setCurrentIdx(nextUnannotated)
+            resetAnnotation()
+          }
+        }, 1500)
+      } else {
+        setSubmitResult({ type: 'error', message: result.message || '提交失败' })
+        message.error(result.message || '提交失败')
+      }
+    } catch (err) {
+      setSubmitResult({ type: 'error', message: '网络错误' })
+      message.error('网络错误')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -91,6 +213,7 @@ export default function AnnotationWorkspace() {
               title={<Space><Tag color="blue">回复 {String.fromCharCode(65 + idx)}</Tag><Text type="secondary">{resp.model}</Text></Space>}
               extra={
                 <Select placeholder="排名" style={{ width: 80 }} value={ranking.includes(idx) ? ranking.indexOf(idx) + 1 : undefined}
+                  disabled={currentSample.annotated}
                   onChange={v => {
                     const newRanking = [...ranking]
                     const existIdx = newRanking.indexOf(idx)
@@ -105,7 +228,7 @@ export default function AnnotationWorkspace() {
               <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>{resp.text}</Paragraph>
             </Card>
           ))}
-          <TextArea rows={2} placeholder="排序理由（必填）" value={rationale} onChange={e => setRationale(e.target.value)} />
+          <TextArea rows={2} placeholder="排序理由（必填）" value={rationale} onChange={e => setRationale(e.target.value)} disabled={currentSample.annotated} />
         </div>
       )
     }
@@ -129,6 +252,7 @@ export default function AnnotationWorkspace() {
                 >
                   <Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 13, minHeight: 120 }}>{resp.text}</Paragraph>
                   <Button type={chosenIdx === idx ? 'primary' : 'default'} block
+                    disabled={currentSample.annotated}
                     onClick={() => setChosenIdx(idx)}>
                     {chosenIdx === idx ? '已选为 Chosen' : '选择此回复'}
                   </Button>
@@ -137,7 +261,7 @@ export default function AnnotationWorkspace() {
             ))}
           </Row>
           <div style={{ marginTop: 12 }}>
-            <TextArea rows={2} placeholder="选择理由（必填）" value={rationale} onChange={e => setRationale(e.target.value)} />
+            <TextArea rows={2} placeholder="选择理由（必填）" value={rationale} onChange={e => setRationale(e.target.value)} disabled={currentSample.annotated} />
           </div>
         </div>
       )
@@ -155,11 +279,13 @@ export default function AnnotationWorkspace() {
             <Space size="large">
               <Button type={feedback === 'thumbs_up' ? 'primary' : 'default'} size="large"
                 icon={<LikeOutlined />} style={{ width: 150, height: 60, fontSize: 18 }}
+                disabled={currentSample.annotated}
                 onClick={() => setFeedback('thumbs_up')}>
                 好
               </Button>
               <Button danger type={feedback === 'thumbs_down' ? 'primary' : 'default'} size="large"
                 icon={<DislikeOutlined />} style={{ width: 150, height: 60, fontSize: 18 }}
+                disabled={currentSample.annotated}
                 onClick={() => setFeedback('thumbs_down')}>
                 不好
               </Button>
@@ -169,6 +295,7 @@ export default function AnnotationWorkspace() {
             <Card size="small" title="安全分类">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Select value={safetyCategory} onChange={setSafetyCategory} style={{ width: '100%' }}
+                  disabled={currentSample.annotated}
                   options={[
                     { label: '毒性内容', value: 'toxicity' },
                     { label: '偏见歧视', value: 'bias' },
@@ -177,7 +304,7 @@ export default function AnnotationWorkspace() {
                     { label: '其他', value: 'other' },
                   ]}
                 />
-                <TextArea rows={2} placeholder="补充说明" value={rationale} onChange={e => setRationale(e.target.value)} />
+                <TextArea rows={2} placeholder="补充说明" value={rationale} onChange={e => setRationale(e.target.value)} disabled={currentSample.annotated} />
               </Space>
             </Card>
           )}
@@ -201,6 +328,7 @@ export default function AnnotationWorkspace() {
                 <TextArea rows={10} value={editedText || resp.text}
                   onChange={e => setEditedText(e.target.value)}
                   style={{ fontSize: 13 }}
+                  disabled={currentSample.annotated}
                 />
               </Card>
             </Col>
@@ -224,7 +352,7 @@ export default function AnnotationWorkspace() {
               <Row key={dim} align="middle" style={{ marginBottom: 12 }}>
                 <Col span={4}><Text strong>{dimLabels[dim]}</Text></Col>
                 <Col span={14}>
-                  <Rate count={10} value={scores[dim] || 0} onChange={v => setScores({ ...scores, [dim]: v })} />
+                  <Rate count={10} value={scores[dim] || 0} onChange={v => setScores({ ...scores, [dim]: v })} disabled={currentSample.annotated} />
                 </Col>
                 <Col span={6}><Text type="secondary">{scores[dim] || 0} / 10</Text></Col>
               </Row>
@@ -247,28 +375,52 @@ export default function AnnotationWorkspace() {
     <div>
       <Title level={4} style={{ marginBottom: 24 }}>标注工作台</Title>
 
-      {/* 任务选择 */}
+      {/* 任务选择 + 进度 */}
       <Card size="small" style={{ marginBottom: 16 }}>
-        <Space>
-          <Text strong>选择标注任务:</Text>
-          <Select
-            placeholder="请选择任务"
-            style={{ width: 400 }}
-            value={selectedTaskId}
-            onChange={setSelectedTaskId}
-            options={tasks.map(t => ({
-              label: <Space>{taskTypeIcons[t.task_type]}<Text>{t.name}</Text><Tag>{t.type_label}</Tag></Space>,
-              value: t.id,
-            }))}
-          />
-          {selectedTask && (
+        <Row align="middle" gutter={16}>
+          <Col flex="auto">
             <Space>
-              <Tag color={taskTypeColors[selectedTask.task_type]}>{selectedTask.type_label}</Tag>
-              <Text type="secondary">进度: {selectedTask.completed_samples}/{selectedTask.total_samples}</Text>
+              <Text strong>选择标注任务:</Text>
+              <Select
+                placeholder="请选择任务"
+                style={{ width: 400 }}
+                value={selectedTaskId}
+                onChange={v => { setSelectedTaskId(v); setSubmitResult(null) }}
+                options={tasks.map(t => ({
+                  label: <Space>{taskTypeIcons[t.task_type]}<Text>{t.name}</Text><Tag>{t.type_label}</Tag></Space>,
+                  value: t.id,
+                }))}
+              />
             </Space>
+          </Col>
+          {selectedTask && (
+            <Col>
+              <Space size="middle">
+                <Tag color={taskTypeColors[selectedTask.task_type]}>{selectedTask.type_label}</Tag>
+                <Progress
+                  type="circle"
+                  size={40}
+                  percent={sampleTotal > 0 ? Math.round((completedCount / sampleTotal) * 100) : 0}
+                  format={p => `${p}%`}
+                />
+                <Text type="secondary">{completedCount}/{sampleTotal}</Text>
+              </Space>
+            </Col>
           )}
-        </Space>
+        </Row>
       </Card>
+
+      {/* 提交反馈 */}
+      {submitResult && (
+        <Alert
+          message={submitResult.message}
+          type={submitResult.type}
+          showIcon
+          closable
+          style={{ marginBottom: 16 }}
+          onClose={() => setSubmitResult(null)}
+        />
+      )}
 
       {currentSample ? (
         <Row gutter={16}>
@@ -297,7 +449,15 @@ export default function AnnotationWorkspace() {
                 <Space>
                   <Button onClick={handlePrev} disabled={currentIdx === 0}>上一条</Button>
                   <Button onClick={handleNext} disabled={currentIdx >= samples.length - 1}>下一条</Button>
-                  <Button type="primary">提交标注</Button>
+                  <Button
+                    type="primary"
+                    onClick={handleSubmit}
+                    loading={submitting}
+                    disabled={!canSubmit() || currentSample.annotated}
+                    icon={currentSample.annotated ? <CheckCircleOutlined /> : undefined}
+                  >
+                    {currentSample.annotated ? '已标注' : '提交标注'}
+                  </Button>
                 </Space>
               </div>
             </Card>

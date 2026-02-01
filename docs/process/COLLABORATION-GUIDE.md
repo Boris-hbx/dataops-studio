@@ -19,14 +19,14 @@
 
 ```text
               backend/configs/ (共享配置层 — YAML Schema)
-             /          |           \
-            /           |            \
-  frontend/       backend/main.py     backend/core/
-    Dev A             Dev B              Dev C
- (前端展示)        (API + 逻辑)       (数据 + 基建)
+             /          |           \            \
+            /           |            \            \
+  frontend/       backend/main.py   backend/core/   tests/ + 标注质量
+    Dev A             Dev B            Dev C           Dev D
+ (前端展示)        (API + 逻辑)     (数据 + 基建)  (测试 + 标注质量)
 ```
 
-**关键**: 三人代码仅在 YAML 配置 Schema 和 API 接口契约上交汇。Dev A 不导入 backend Python 代码; Dev C 的配置变更通过 API reload 反映到 Dev B。
+**关键**: 四人代码仅在 YAML 配置 Schema 和 API 接口契约上交汇。Dev A 不导入 backend Python 代码; Dev C 的配置变更通过 API reload 反映到 Dev B; Dev D 横向覆盖端到端测试与标注模块质量保障。
 
 ## 3. 谁给谁提供什么 (Mock-First 开发)
 
@@ -43,6 +43,12 @@ Dev A ───提供 UI 反馈──→ Dev B
 
 Dev B ───提供配置变更需求──→ Dev C
        (YAML 配置需要新增什么字段?)
+
+Dev D ───提供测试用例 + 质量报告──→ Dev A / Dev B / Dev C
+       (E2E 测试覆盖, 标注流程验证, 数据一致性校验)
+
+Dev B ───提供标注 API 契约──→ Dev D
+       (标注提交/审核/导出 API 的接口说明)
 ```
 
 ## 4. 接口变更协议
@@ -105,6 +111,10 @@ main (保护分支)
   ├── feat/c-ci-pipeline           Dev C: CI/CD 流水线
   ├── feat/c-test-framework        Dev C: 测试框架搭建
   │
+  ├── feat/d-annotation-e2e        Dev D: 标注模块 E2E 测试
+  ├── feat/d-submit-review-test    Dev D: 提交/审核流程测试
+  ├── feat/d-data-validation       Dev D: 数据校验与导出验证
+  │
   └── fix/42-api-cors              Bug 修复分支
 ```
 
@@ -131,9 +141,10 @@ Reviewer 审查 → 评论 → 开发者修改 → 再审
 
 | 提交者 | Reviewer | 备选 |
 |--------|----------|------|
-| Dev A (Baoxing) | Dev B (Junjie) | Dev C |
-| Dev B (Junjie) | Dev C (Sihao) | Dev A |
-| Dev C (Sihao) | Dev A (Baoxing) | Dev B |
+| Dev A (Baoxing) | Dev B (Junjie) | Dev D |
+| Dev B (Junjie) | Dev C (Sihao) | Dev D |
+| Dev C (Sihao) | Dev A (Baoxing) | Dev D |
+| Dev D (Feng Wen) | Dev B (Junjie) | Dev A |
 
 **响应 SLA**: 2 小时内. 忙碌时备选接手.
 
@@ -147,8 +158,8 @@ Reviewer 审查 → 评论 → 开发者修改 → 再审
 ## 8. Code Ownership
 
 ```text
-# 共享层 — 任何变更需三人同意
-backend/configs/          @baoxing @junjie @sihao
+# 共享层 — 任何变更需四人同意
+backend/configs/          @baoxing @junjie @sihao @fengwen
 
 # 各自负责
 frontend/                 @baoxing
@@ -158,6 +169,10 @@ backend/core/             @junjie
 # 基础设施
 .github/                  @sihao
 start.bat                 @sihao
+
+# 测试与标注质量
+tests/                    @fengwen
+backend/configs/annotation.yaml (annotation_samples)  @fengwen @sihao
 
 # 文档
 docs/                     @jianmin

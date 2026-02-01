@@ -23,6 +23,7 @@
 | `03-testing.md` | 测试策略、覆盖率、Mock |
 | `04-git-workflow.md` | 分支、提交、PR、Review |
 | `05-directory-structure.md` | 目录结构与文件归档 |
+| `06-infrastructure.md` | 端口注册表、基础设施常量、环境变量 |
 | `99-quick-ref.md` | 日常开发速查表 |
 
 ## 适用范围

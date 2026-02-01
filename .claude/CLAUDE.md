@@ -25,11 +25,12 @@ backend/            (L2 API + Logic)    → FastAPI REST API, YAML 配置驱动
 backend/configs/    (L3 Data + Config)  → YAML 配置文件, 数据模型定义
 ```
 
-三人开发分工:
+四人开发分工:
 ```
 Dev A (Baoxing Huai)  → frontend/       前端所有页面与组件
 Dev B (Junjie Duan)   → backend/        后端 API、业务逻辑、调度引擎
 Dev C (Sihao Li)      → 数据层 + CI/CD  数据模型、配置管理、基础设施
+Dev D (Feng Wen)      → 测试 + 标注质量  E2E 测试、标注模块质量保障、数据校验
 ```
 
 ## Key Conventions
@@ -49,7 +50,7 @@ cd backend && python -m uvicorn main:app --reload --port 8000
 
 # 前端
 cd frontend && npm install
-cd frontend && npx vite --port 6666
+cd frontend && npx vite --port 6660
 
 # 格式化
 cd backend && ruff format .
@@ -72,3 +73,4 @@ cd frontend && npx vitest run
 - `docs/architecture/TECH-STANDARDS.md` — 技术栈与编码规范
 - `docs/process/COLLABORATION-GUIDE.md` — 团队协作流程
 - `.claude/standards/` — 工程规范 (MUST/SHOULD/MAY)
+- `.claude/agents/` — Agent Team 架构 (Leader + Sub-Agent 定义)

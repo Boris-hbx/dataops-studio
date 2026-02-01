@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Tag, Typography, Space, Row, Col, Statistic, Progress,
-  Tabs, Badge, Tooltip,
+  Tabs, Badge, Tooltip, Button, Modal, Descriptions, Input, message,
 } from 'antd'
 import {
   ExperimentOutlined, CheckCircleOutlined, ClockCircleOutlined,
   TeamOutlined, FileTextOutlined, BarChartOutlined,
-  PauseCircleOutlined, EditOutlined,
+  PauseCircleOutlined, EditOutlined, SearchOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons'
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -14,7 +16,8 @@ import {
   ResponsiveContainer, Legend,
 } from 'recharts'
 
-const { Title, Text } = Typography
+const { Title, Text, Paragraph } = Typography
+const { TextArea } = Input
 const COLORS = ['#1677ff', '#52c41a', '#722ed1', '#faad14', '#ff4d4f', '#13c2c2']
 
 const taskTypeColors = {
@@ -32,20 +35,153 @@ const statusConfig = {
   completed: { color: 'blue', text: '已完成' },
 }
 
+// --- ReviewPanel 子组件 ---
+function ReviewPanel({ taskId, visible, onClose, onReviewed }) {
+  const [submissions, setSubmissions] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [reviewingId, setReviewingId] = useState(null)
+  const [comment, setComment] = useState('')
+  const [byStatus, setByStatus] = useState({})
+
+  const loadSubmissions = () => {
+    if (!taskId) return
+    setLoading(true)
+    fetch(`/api/annotation/tasks/${taskId}/submissions?review_status=pending`)
+      .then(r => r.json())
+      .then(data => {
+        setSubmissions(data.submissions || [])
+        setByStatus(data.by_status || {})
+      })
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    if (visible && taskId) loadSubmissions()
+  }, [visible, taskId])
+
+  const handleReview = async (submissionId, action) => {
+    setReviewingId(submissionId)
+    try {
+      const resp = await fetch(`/api/annotation/tasks/${taskId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submission_id: submissionId, action, comment }),
+      })
+      const result = await resp.json()
+      if (result.status === 'ok') {
+        message.success(`${action === 'approve' ? '已批准' : '已拒绝'}: ${submissionId}`)
+        setComment('')
+        loadSubmissions()
+        if (onReviewed) onReviewed()
+      } else {
+        message.error(result.message || '操作失败')
+      }
+    } catch {
+      message.error('网络错误')
+    } finally {
+      setReviewingId(null)
+    }
+  }
+
+  const renderAnnotationData = (sub) => {
+    const type = sub.task_type
+    if (type === 'rlhf_ranking') {
+      return <><Text strong>排序: </Text><Text>{JSON.stringify(sub.ranking)}</Text><br/><Text strong>理由: </Text><Text>{sub.rationale}</Text></>
+    }
+    if (type === 'dpo_pairwise') {
+      return <><Text strong>Chosen: </Text><Text>回复 {sub.chosen_index}</Text><br/><Text strong>理由: </Text><Text>{sub.rationale}</Text></>
+    }
+    if (type === 'kto_binary') {
+      return <><Text strong>反馈: </Text><Tag color={sub.feedback === 'thumbs_up' ? 'green' : 'red'}>{sub.feedback}</Tag>{sub.safety_category && sub.safety_category !== 'none' && <><br/><Text strong>安全类别: </Text><Tag>{sub.safety_category}</Tag></>}</>
+    }
+    if (type === 'sft_editing') {
+      return <><Text strong>编辑比率: </Text><Text>{sub.edit_ratio}</Text><br/><Text strong>编辑回复: </Text><Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: 12 }}>{sub.edited_response}</Paragraph></>
+    }
+    if (type === 'reward_scoring') {
+      return <><Text strong>评分: </Text>{sub.scores && Object.entries(sub.scores).map(([k, v]) => <Tag key={k}>{k}: {v}</Tag>)}<br/><Text strong>综合: </Text><Text>{sub.overall_score}</Text></>
+    }
+    return <Text type="secondary">无数据</Text>
+  }
+
+  return (
+    <Modal
+      title={<Space><SearchOutlined /> 审核标注 — {taskId}</Space>}
+      open={visible}
+      onCancel={onClose}
+      footer={null}
+      width={800}
+    >
+      <Space style={{ marginBottom: 16 }}>
+        <Badge status="warning" text={`待审核 ${byStatus.pending || 0}`} />
+        <Badge status="success" text={`已批准 ${byStatus.approved || 0}`} />
+        <Badge status="error" text={`已拒绝 ${byStatus.rejected || 0}`} />
+      </Space>
+
+      {submissions.length === 0 && !loading && (
+        <div style={{ textAlign: 'center', padding: '40px 0' }}>
+          <CheckCircleOutlined style={{ fontSize: 36, color: '#52c41a' }} />
+          <Title level={5} type="secondary" style={{ marginTop: 12 }}>没有待审核的提交</Title>
+        </div>
+      )}
+
+      {submissions.map(sub => (
+        <Card key={sub.id} size="small" style={{ marginBottom: 12 }}
+          title={<Space><Tag>{sub.id}</Tag><Text type="secondary">{sub.annotator}</Text><Text type="secondary">{sub.submit_time?.slice(0, 19)}</Text></Space>}
+        >
+          <Descriptions column={1} size="small" style={{ marginBottom: 8 }}>
+            <Descriptions.Item label="Prompt">
+              <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: 12 }}>{sub.prompt}</Paragraph>
+            </Descriptions.Item>
+            <Descriptions.Item label="标注数据">
+              {renderAnnotationData(sub)}
+            </Descriptions.Item>
+          </Descriptions>
+          <Space style={{ marginTop: 8 }}>
+            <TextArea
+              placeholder="审核意见（可选）"
+              rows={1}
+              style={{ width: 300 }}
+              value={reviewingId === sub.id ? comment : ''}
+              onChange={e => { setReviewingId(sub.id); setComment(e.target.value) }}
+            />
+            <Button type="primary" size="small"
+              loading={reviewingId === sub.id}
+              onClick={() => handleReview(sub.id, 'approve')}
+              icon={<CheckCircleOutlined />}>
+              批准
+            </Button>
+            <Button danger size="small"
+              loading={reviewingId === sub.id}
+              onClick={() => handleReview(sub.id, 'reject')}
+              icon={<CloseCircleOutlined />}>
+              拒绝
+            </Button>
+          </Space>
+        </Card>
+      ))}
+    </Modal>
+  )
+}
+
+// --- 主组件 ---
 export default function AnnotationTasks() {
+  const navigate = useNavigate()
   const [tasks, setTasks] = useState([])
   const [annotators, setAnnotators] = useState([])
   const [quality, setQuality] = useState(null)
   const [stats, setStats] = useState(null)
+  const [reviewTaskId, setReviewTaskId] = useState(null)
 
-  useEffect(() => {
+  const loadData = () => {
     fetch('/api/annotation/tasks').then(r => r.json()).then(setTasks)
     fetch('/api/annotation/annotators').then(r => r.json()).then(setAnnotators)
     fetch('/api/annotation/quality').then(r => r.json()).then(setQuality)
     fetch('/api/annotation/stats').then(r => r.json()).then(setStats)
-  }, [])
+  }
 
-  const totalSamples = tasks.reduce((s, t) => s + t.total_samples, 0)
+  useEffect(() => { loadData() }, [])
+
+  const totalSamples = tasks.reduce((s, t) => s + (t.total_samples || 0), 0)
   const totalCompleted = tasks.reduce((s, t) => s + t.completed_samples, 0)
   const activeTasks = tasks.filter(t => t.status === 'active').length
 
@@ -109,6 +245,23 @@ export default function AnnotationTasks() {
         </Tag>
       ),
     },
+    {
+      title: '操作', key: 'actions', width: 160, fixed: 'right',
+      render: (_, r) => (
+        <Space>
+          {r.status === 'active' && (
+            <Button type="link" size="small"
+              onClick={() => navigate(`/annotation/workspace?task=${r.id}`)}>
+              标注
+            </Button>
+          )}
+          <Button type="link" size="small"
+            onClick={() => setReviewTaskId(r.id)}>
+            审核{r.pending_review > 0 && <Badge count={r.pending_review} size="small" style={{ marginLeft: 4 }} />}
+          </Button>
+        </Space>
+      ),
+    },
   ]
 
   const annotatorColumns = [
@@ -155,7 +308,8 @@ export default function AnnotationTasks() {
       label: <span><FileTextOutlined /> 标注任务</span>,
       children: (
         <Card size="small">
-          <Table columns={taskColumns} dataSource={tasks} rowKey="id" size="small" pagination={false} />
+          <Table columns={taskColumns} dataSource={tasks} rowKey="id" size="small" pagination={false}
+            scroll={{ x: 1200 }} />
         </Card>
       ),
     },
@@ -315,6 +469,13 @@ export default function AnnotationTasks() {
       </Row>
 
       <Tabs items={tabItems} size="large" />
+
+      <ReviewPanel
+        taskId={reviewTaskId}
+        visible={!!reviewTaskId}
+        onClose={() => setReviewTaskId(null)}
+        onReviewed={loadData}
+      />
     </div>
   )
 }

@@ -8,6 +8,7 @@
 dataops-studio/
 ├── .claude/                  # AI 辅助开发配置与工程规范
 │   ├── CLAUDE.md             # 项目概览 (AI 上下文入口)
+│   ├── agents/               # Agent Team 架构定义
 │   └── standards/            # 分级工程规范 (00-xx 编号)
 │
 ├── docs/                     # 项目文档 (分类归档)

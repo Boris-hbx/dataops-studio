@@ -23,8 +23,8 @@ cd backend && pytest
 # 安装依赖
 cd frontend && npm install
 
-# 启动 (开发模式, 端口 6666)
-cd frontend && npx vite --port 6666
+# 启动 (开发模式, 端口 6660)
+cd frontend && npx vite --port 6660
 
 # 格式化
 cd frontend && npx prettier --write src/

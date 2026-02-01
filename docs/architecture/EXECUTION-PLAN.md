@@ -37,18 +37,18 @@
 
 ## 3. 三人分工
 
-### 代码依赖拓扑 (三人解耦)
+### 代码依赖拓扑 (四人解耦)
 
 ```text
                 backend/configs/ (共享配置层)
-               /         |          \
-              /          |           \
-    frontend/      backend/main.py     backend/core/
-     Dev A            Dev B              Dev C
-  (Presentation)   (API + Logic)    (Data + Infra)
+               /         |          \          \
+              /          |           \          \
+    frontend/      backend/main.py   backend/core/   tests/ + 标注质量
+     Dev A            Dev B            Dev C            Dev D
+  (Presentation)   (API + Logic)   (Data + Infra)  (QA + Annotation)
 ```
 
-**关键原则**: 三人代码仅在 `backend/configs/` (YAML 配置) 和 API 接口契约上交汇。前端只通过 HTTP API 调用后端, 不直接依赖后端 Python 代码。
+**关键原则**: 四人代码仅在 `backend/configs/` (YAML 配置) 和 API 接口契约上交汇。前端只通过 HTTP API 调用后端, 不直接依赖后端 Python 代码。Dev D 横向覆盖端到端测试与标注模块质量。
 
 ### Dev A: Baoxing Huai — 前端展示层
 
@@ -91,6 +91,19 @@
 - 测试框架搭建 (pytest + vitest)
 - 代码质量工具链 (ruff, ESLint, Prettier)
 
+### Dev D: Feng Wen — 测试与标注质量
+
+**目录**: `tests/`, `backend/configs/annotation.yaml`, 标注模块相关代码
+
+**职责**:
+- E2E 测试: 端到端测试用例编写与维护 (pytest + 前端 Vitest)
+- 标注模块质量保障: 标注提交/审核流程验证, 数据一致性校验
+- 标注样本数据维护: `annotation.yaml` 中 `annotation_samples` 的扩展与校验
+- 标注数据导出验证: 确保导出数据格式与字段完整性
+- API 集成测试: 跨模块 API 调用场景的自动化测试
+- 质量指标监控: 标注通过率、Kappa 一致性指标的回归验证
+- Bug 回归测试: 修复后的回归用例编写
+
 ### Sponsor: Jianmin Lu
 
 **职责**:
@@ -121,10 +134,10 @@ GET /api/config/reload             → ReloadResult
 
 ## 5. 开发排期
 
-| 阶段 | 内容 | Dev A | Dev B | Dev C |
-|------|------|-------|-------|-------|
-| D1 | 架构搭建 | Vite + React + 路由 + Layout | FastAPI 骨架 + YAML 加载 | 配置文件设计 + CI 搭建 |
-| D2 | 核心页面 | Dashboard + Pipelines 页面 | Dashboard API + Pipelines API | 数据模拟引擎 |
-| D3 | 完善功能 | Quality + Cost 页面 | Quality API + Cost API | 测试框架 + 配置校验 |
-| D4 | 集成联调 | 前后端联调, 样式打磨 | Lineage API + 热重载 | 集成测试 + 启动脚本 |
-| D5 | 收尾 | 响应式适配, 细节优化 | 性能优化, 错误处理 | E2E 验证, 文档完善 |
+| 阶段 | 内容 | Dev A | Dev B | Dev C | Dev D |
+|------|------|-------|-------|-------|-------|
+| D1 | 架构搭建 | Vite + React + 路由 + Layout | FastAPI 骨架 + YAML 加载 | 配置文件设计 + CI 搭建 | 测试框架搭建, 标注样本 schema 设计 |
+| D2 | 核心页面 | Dashboard + Pipelines 页面 | Dashboard API + Pipelines API | 数据模拟引擎 | API 冒烟测试, 标注样本数据填充 |
+| D3 | 完善功能 | Quality + Cost 页面 | Quality API + Cost API | 测试框架 + 配置校验 | 标注提交/审核 E2E 测试 |
+| D4 | 集成联调 | 前后端联调, 样式打磨 | Lineage API + 热重载 | 集成测试 + 启动脚本 | 端到端标注流程验证, 数据导出校验 |
+| D5 | 收尾 | 响应式适配, 细节优化 | 性能优化, 错误处理 | E2E 验证, 文档完善 | 回归测试套件, 质量指标基线建立 |
