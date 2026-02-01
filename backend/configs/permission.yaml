@@ -1,0 +1,37 @@
+# 权限配置（Demo 模式下未启用认证，此文件仅作展示）
+# TODO: 接入公司 SSO 后启用 — DATA-892
+# last updated: 2024-08-20 by ops-team
+
+roles:
+  - name: admin
+    permissions:
+      - pipeline:read
+      - pipeline:write
+      - pipeline:execute
+      - quality:read
+      - quality:write
+      - lineage:read
+      - cost:read
+      - config:write
+
+  - name: developer
+    permissions:
+      - pipeline:read
+      - pipeline:write
+      - quality:read
+      - lineage:read
+      - cost:read
+
+  - name: viewer
+    permissions:
+      - pipeline:read
+      - quality:read
+      - lineage:read
+      - cost:read
+
+# 默认 Demo 模式不做鉴权
+auth:
+  enabled: false
+  provider: none  # 可选: sso | ldap | none
+  sso_endpoint: ""
+  # session_timeout_minutes: 480

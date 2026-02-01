@@ -1,0 +1,130 @@
+# 数据质量规则配置
+# 每条规则绑定一个目标表，在 pipeline 执行后触发检查
+# enabled: true/false 控制规则是否生效
+#
+# severity 取值: critical | warning | info
+# check_type 取值: null_check | range_check | uniqueness | freshness | custom_sql
+#
+# ⚠️ 已知问题:
+#   - QR-005 (user_profile null check) enabled=false，上线后忘记启用
+#   - QR-003 的 threshold 设置偏低，会产生大量误报
+
+rules:
+  - id: QR-001
+    name: "订单金额非空检查"
+    description: "dw_orders_daily.total_amount 不允许为 NULL"
+    target_table: dw_orders_daily
+    pipeline_id: orders_daily
+    check_type: null_check
+    column: total_amount
+    enabled: true
+    severity: critical
+    threshold: 0.0
+    created_by: zhang.wei
+    created_at: "2023-04-01"
+
+  - id: QR-002
+    name: "订单金额范围检查"
+    description: "单笔订单金额应在 0.01 ~ 1000000 之间"
+    target_table: dw_orders_daily
+    pipeline_id: orders_daily
+    check_type: range_check
+    column: total_amount
+    params:
+      min: 0.01
+      max: 1000000
+    enabled: true
+    severity: warning
+    threshold: 0.001
+    created_by: zhang.wei
+    created_at: "2023-04-01"
+
+  - id: QR-003
+    name: "支付流水时效检查"
+    description: "dw_payments_hourly 的数据延迟不超过 2 小时"
+    target_table: dw_payments_hourly
+    pipeline_id: payments_hourly
+    check_type: freshness
+    column: event_time
+    params:
+      max_delay_hours: 2
+      # ⚠️ 这个阈值太严格了，经常在高峰期误报
+      # 建议调整为 4 小时，但是没人改
+    enabled: true
+    severity: critical
+    threshold: 0.0
+    created_by: li.ming
+    created_at: "2023-07-15"
+
+  - id: QR-004
+    name: "支付金额唯一性检查"
+    description: "同一笔 payment_id 不应出现重复"
+    target_table: dw_payments_hourly
+    pipeline_id: payments_hourly
+    check_type: uniqueness
+    column: payment_id
+    enabled: true
+    severity: critical
+    threshold: 0.0
+    created_by: li.ming
+    created_at: "2023-07-15"
+
+  - id: QR-005
+    name: "用户画像 NULL 检查"
+    description: "dw_user_profile.user_id 不允许为 NULL"
+    target_table: dw_user_profile
+    pipeline_id: user_profile_sync
+    check_type: null_check
+    column: user_id
+    # ⚠️ BUG: 这条规则上线时 PM 说「先观察，别开」
+    # 然后就再也没人打开过
+    # 导致 user_profile 中存在 NULL user_id 的脏数据
+    enabled: false
+    severity: critical
+    threshold: 0.0
+    created_by: wang.fang
+    created_at: "2024-01-20"
+
+  - id: QR-006
+    name: "风控评分范围检查"
+    description: "risk_score 应在 0~100 之间"
+    target_table: dw_risk_scores
+    pipeline_id: risk_score_calc
+    check_type: range_check
+    column: risk_score
+    params:
+      min: 0
+      max: 100
+    enabled: true
+    severity: warning
+    threshold: 0.005
+    created_by: chen.lei
+    created_at: "2023-09-10"
+
+  - id: QR-007
+    name: "订单日期分区检查"
+    description: "order_date 不应有未来日期"
+    target_table: dw_orders_daily
+    pipeline_id: orders_daily
+    check_type: custom_sql
+    params:
+      sql: "SELECT COUNT(*) FROM dw_orders_daily WHERE order_date > CURRENT_DATE"
+      max_count: 0
+    enabled: true
+    severity: warning
+    threshold: 0
+    created_by: zhang.wei
+    created_at: "2024-03-05"
+
+  - id: QR-008
+    name: "营销归因数据完整性"
+    description: "dm_marketing_attribution 中 channel 字段不允许为空"
+    target_table: dm_marketing_attribution
+    pipeline_id: marketing_attribution
+    check_type: null_check
+    column: channel
+    enabled: true
+    severity: warning
+    threshold: 0.0
+    created_by: zhao.yang
+    created_at: "2024-05-12"

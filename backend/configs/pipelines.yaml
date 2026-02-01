@@ -1,0 +1,157 @@
+# Pipeline definitions for DataOps Studio
+# 数据管道配置 — 所有 pipeline 行为由此文件驱动
+# 修改此文件 → 重启后端（或调用 /api/reload）→ UI 立刻反映变化
+#
+# status 取值: active | paused | failed | degraded
+# schedule 使用 cron 语法
+# owner 为负责团队
+#
+# ⚠️ risk_score_calc 仍依赖 legacy ETL 脚本，迁移工单 DATA-1024 已创建但未排期
+# ⚠️ user_profile_sync 的质量规则 QR-005 配置了但 enabled=false，上线时忘记打开
+
+pipelines:
+  - id: orders_daily
+    name: "订单日聚合"
+    description: "每日凌晨拉取 orders 表，聚合后写入 dw_orders_daily"
+    schedule: "0 2 * * *"
+    status: active
+    owner: data-platform
+    source_tables:
+      - ods_orders
+      - ods_order_items
+    target_table: dw_orders_daily
+    dependencies: []
+    config:
+      batch_size: 50000
+      retry_count: 3
+      timeout_minutes: 60
+      partition_key: order_date
+    tags:
+      - core
+      - revenue
+    created_at: "2023-03-15"
+    last_modified: "2025-11-02"
+
+  - id: payments_hourly
+    name: "支付流水小时聚合"
+    description: "每小时聚合支付流水，供风控和财务团队消费"
+    schedule: "15 * * * *"
+    status: active
+    owner: fintech-data
+    source_tables:
+      - ods_payments
+      - ods_refunds
+    target_table: dw_payments_hourly
+    dependencies:
+      - orders_daily
+    config:
+      batch_size: 20000
+      retry_count: 2
+      timeout_minutes: 30
+      incremental: true
+    tags:
+      - finance
+      - sla-critical
+    created_at: "2023-06-20"
+    last_modified: "2025-09-18"
+
+  - id: user_profile_sync
+    name: "用户画像同步"
+    description: "从多个来源同步用户画像数据，写入统一用户宽表"
+    schedule: "30 3 * * *"
+    status: active
+    owner: user-growth
+    source_tables:
+      - ods_users
+      - ods_user_behavior
+      - ods_user_tags
+    target_table: dw_user_profile
+    dependencies: []
+    config:
+      batch_size: 100000
+      retry_count: 2
+      timeout_minutes: 90
+      merge_strategy: upsert
+      # NOTE: 质量规则 QR-005 配置了 null_check 但未启用
+      # 上线时产品经理说"先观察一周再开"，然后就忘了
+      quality_gate_enabled: false
+    tags:
+      - user
+      - growth
+    created_at: "2023-01-10"
+    last_modified: "2025-07-22"
+
+  - id: risk_score_calc
+    name: "风控评分计算"
+    description: "基于用户行为和交易数据计算风险评分"
+    schedule: "0 4 * * *"
+    status: degraded
+    owner: risk-engine
+    source_tables:
+      - dw_orders_daily
+      - dw_user_profile
+      - dw_payments_hourly
+    target_table: dw_risk_scores
+    dependencies:
+      - orders_daily
+      - user_profile_sync
+      - payments_hourly
+    config:
+      batch_size: 10000
+      retry_count: 1
+      timeout_minutes: 120
+      # ⚠️ 仍然调用 legacy/etl_scripts/calc_risk.py
+      # 新版本在 core/risk_engine 里但还没切换
+      use_legacy_engine: true
+      legacy_script: "legacy/etl_scripts/calc_risk.py"
+    tags:
+      - risk
+      - compliance
+      - legacy-debt
+    created_at: "2022-08-05"
+    last_modified: "2024-12-10"
+
+  - id: marketing_attribution
+    name: "营销归因分析"
+    description: "计算各渠道的营销归因和 ROI"
+    schedule: "0 6 * * 1"
+    status: active
+    owner: marketing-analytics
+    source_tables:
+      - ods_ad_clicks
+      - ods_conversions
+      - dw_orders_daily
+    target_table: dm_marketing_attribution
+    dependencies:
+      - orders_daily
+    config:
+      batch_size: 200000
+      retry_count: 2
+      timeout_minutes: 45
+      attribution_model: last_click
+    tags:
+      - marketing
+      - weekly
+    created_at: "2024-02-14"
+    last_modified: "2025-10-30"
+
+  - id: inventory_snapshot
+    name: "库存快照"
+    description: "每日库存快照，记录 SKU 级别库存变化"
+    schedule: "0 1 * * *"
+    status: paused
+    owner: supply-chain
+    source_tables:
+      - ods_inventory
+      - ods_warehouses
+    target_table: dw_inventory_snapshot
+    dependencies: []
+    config:
+      batch_size: 500000
+      retry_count: 3
+      timeout_minutes: 30
+    tags:
+      - supply-chain
+      - paused-review
+    created_at: "2023-09-01"
+    last_modified: "2025-06-15"
