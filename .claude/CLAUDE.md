@@ -73,4 +73,8 @@ cd frontend && npx vitest run
 - `docs/architecture/TECH-STANDARDS.md` — 技术栈与编码规范
 - `docs/process/COLLABORATION-GUIDE.md` — 团队协作流程
 - `.claude/standards/` — 工程规范 (MUST/SHOULD/MAY)
-- `.claude/agents/` — Agent Team 架构 (Leader + Sub-Agent 定义)
+- `.claude/commands/agents/` — 能力域 Agent 定义（架构、UX、安全、风控、审查、全栈、复盘 + 个人画像）
+- `.claude/commands/team-template.md` — 团队编排模板（六幕流程）
+- `.claude/commands/quick-review.md` — 快速审查命令
+- `.claude/agents/README.md` — Agent 系统架构总览
+- `.claude/agents/INTER-TEAM-PROTOCOL.md` — 跨团队协作协议
