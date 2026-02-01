@@ -46,12 +46,12 @@ timeout /t 3 /nobreak >nul
 :: 启动前端
 echo [4/4] 启动前端 (端口 5173)...
 cd /d "%~dp0frontend"
-start "DataOps-Frontend" cmd /k "npx vite --open"
+start "DataOps-Frontend" cmd /k "npx vite --port 6666 --open"
 
 echo.
 echo ============================================
 echo   启动完成!
-echo   前端: http://localhost:5173
+echo   前端: http://localhost:6666
 echo   后端: http://localhost:8000/docs
 echo ============================================
 echo.
