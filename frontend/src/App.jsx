@@ -8,6 +8,7 @@ import AnnotationTasks from "./pages/AnnotationTasks";
 import AnnotationWorkspace from "./pages/AnnotationWorkspace";
 import AgentAnnotation from "./pages/AgentAnnotation";
 import AgentAnnotationWorkspace from "./pages/AgentAnnotationWorkspace";
+import DataLineage from "./pages/DataLineage";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/pipelines" element={<Pipelines />} />
         <Route path="/quality" element={<QualityRules />} />
         <Route path="/cost" element={<CostAnalysis />} />
+        <Route path="/lineage" element={<DataLineage />} />
         <Route path="/annotation" element={<AnnotationTasks />} />
         <Route path="/annotation/workspace" element={<AnnotationWorkspace />} />
         <Route path="/agent-annotation" element={<AgentAnnotation />} />

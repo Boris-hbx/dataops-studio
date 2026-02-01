@@ -10,6 +10,7 @@ import { registerLineageTools } from "./tools/lineage.js";
 import { registerDashboardTools } from "./tools/dashboard.js";
 import { registerTeamTools } from "./tools/teams.js";
 import { registerAnnotationTools } from "./tools/annotation.js";
+import { registerAgentAnnotationTools } from "./tools/agent-annotation.js";
 import { registerConfigTools } from "./tools/config.js";
 import { registerResources } from "./resources/index.js";
 
@@ -18,15 +19,16 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
-// Register all tools (14 total)
-registerPipelineTools(server);    // 3 tools
-registerQualityTools(server);     // 2 tools
-registerCostTools(server);        // 2 tools
-registerLineageTools(server);     // 1 tool
-registerDashboardTools(server);   // 2 tools
-registerTeamTools(server);        // 1 tool
-registerAnnotationTools(server);  // 2 tools
-registerConfigTools(server);      // 1 tool
+// Register all tools (17 total)
+registerPipelineTools(server);           // 3 tools
+registerQualityTools(server);            // 2 tools
+registerCostTools(server);               // 2 tools
+registerLineageTools(server);            // 1 tool
+registerDashboardTools(server);          // 2 tools
+registerTeamTools(server);               // 1 tool
+registerAnnotationTools(server);         // 2 tools
+registerAgentAnnotationTools(server);    // 3 tools
+registerConfigTools(server);             // 1 tool
 
 // Register all resources (5 total)
 registerResources(server);

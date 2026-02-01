@@ -24,6 +24,8 @@
 | `04-git-workflow.md` | 分支、提交、PR、Review |
 | `05-directory-structure.md` | 目录结构与文件归档 |
 | `06-infrastructure.md` | 端口注册表、基础设施常量、环境变量 |
+| `07-api-design.md` | API URL 命名、HTTP 方法、响应格式、错误码 |
+| `08-react-components.md` | 组件文件结构、Props、Hooks、UI 选择、样式 |
 | `99-quick-ref.md` | 日常开发速查表 |
 
 ## 适用范围

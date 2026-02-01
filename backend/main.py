@@ -2,6 +2,7 @@
 DataOps Studio — 数据运维平台 API 后端
 启动: uvicorn main:app --reload --port 8000
 """
+
 import os
 import random
 import hashlib
@@ -30,6 +31,7 @@ app.add_middleware(
 
 # Agent 工具调用标注模块
 from agent_annotation import router as agent_annotation_router
+
 app.include_router(agent_annotation_router)
 
 # ---------------------------------------------------------------------------
@@ -37,9 +39,11 @@ app.include_router(agent_annotation_router)
 # ---------------------------------------------------------------------------
 CONFIG_DIR = Path(__file__).parent / "configs"
 
+
 def _load_yaml(name: str):
     with open(CONFIG_DIR / name, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
 
 _pipelines_cfg = _load_yaml("pipelines.yaml")
 _quality_cfg = _load_yaml("quality.yaml")
@@ -100,7 +104,11 @@ def _generate_executions():
             continue
         schedule = p["schedule"]
         # 简化: daily → 1次/天, hourly → 24次/天, weekly → 1次/周
-        if "* * * *" in schedule and schedule.startswith("0 ") is False and schedule.startswith("15 "):
+        if (
+            "* * * *" in schedule
+            and schedule.startswith("0 ") is False
+            and schedule.startswith("15 ")
+        ):
             runs_per_day = 24
         elif "* * 1" in schedule:
             runs_per_day = 1 / 7
@@ -109,27 +117,47 @@ def _generate_executions():
 
         for day_offset in range(30, 0, -1):
             day = now - timedelta(days=day_offset)
-            n_runs = max(1, int(runs_per_day)) if runs_per_day >= 1 else (1 if day_offset % 7 == 0 else 0)
+            n_runs = (
+                max(1, int(runs_per_day))
+                if runs_per_day >= 1
+                else (1 if day_offset % 7 == 0 else 0)
+            )
             for run_idx in range(n_runs):
                 success = random.random() < PIPELINE_SUCCESS_RATE.get(pid, 0.9)
                 base_dur = PIPELINE_AVG_DURATION.get(pid, 30)
                 duration = max(5, int(base_dur * (0.7 + random.random() * 0.6)))
-                cost = round(PIPELINE_COST_PER_RUN.get(pid, 5) * (0.8 + random.random() * 0.4), 2)
-                rows_processed = random.randint(10000, 500000) if success else random.randint(0, 5000)
-                start_time = day.replace(hour=random.randint(0, 23), minute=random.randint(0, 59))
-                exec_id = hashlib.md5(f"{pid}-{start_time.isoformat()}-{run_idx}".encode()).hexdigest()[:12]
-                executions.append({
-                    "id": exec_id,
-                    "pipeline_id": pid,
-                    "pipeline_name": p["name"],
-                    "start_time": start_time.isoformat(),
-                    "end_time": (start_time + timedelta(minutes=duration)).isoformat(),
-                    "duration_minutes": duration,
-                    "status": "success" if success else random.choice(["failed", "timeout"]),
-                    "rows_processed": rows_processed,
-                    "cost_yuan": cost,
-                    "owner": p["owner"],
-                })
+                cost = round(
+                    PIPELINE_COST_PER_RUN.get(pid, 5) * (0.8 + random.random() * 0.4), 2
+                )
+                rows_processed = (
+                    random.randint(10000, 500000)
+                    if success
+                    else random.randint(0, 5000)
+                )
+                start_time = day.replace(
+                    hour=random.randint(0, 23), minute=random.randint(0, 59)
+                )
+                exec_id = hashlib.md5(
+                    f"{pid}-{start_time.isoformat()}-{run_idx}".encode()
+                ).hexdigest()[:12]
+                executions.append(
+                    {
+                        "id": exec_id,
+                        "pipeline_id": pid,
+                        "pipeline_name": p["name"],
+                        "start_time": start_time.isoformat(),
+                        "end_time": (
+                            start_time + timedelta(minutes=duration)
+                        ).isoformat(),
+                        "duration_minutes": duration,
+                        "status": "success"
+                        if success
+                        else random.choice(["failed", "timeout"]),
+                        "rows_processed": rows_processed,
+                        "cost_yuan": cost,
+                        "owner": p["owner"],
+                    }
+                )
     executions.sort(key=lambda x: x["start_time"], reverse=True)
     return executions
 
@@ -145,18 +173,22 @@ def _generate_quality_checks():
             day = now - timedelta(days=day_offset)
             passed = random.random() > 0.12
             value = 0.0 if passed else round(random.uniform(0.001, 0.05), 4)
-            checks.append({
-                "rule_id": rule["id"],
-                "rule_name": rule["name"],
-                "pipeline_id": rule["pipeline_id"],
-                "target_table": rule["target_table"],
-                "check_type": rule["check_type"],
-                "severity": rule["severity"],
-                "check_time": day.replace(hour=5, minute=random.randint(0, 59)).isoformat(),
-                "passed": passed,
-                "violation_ratio": value,
-                "threshold": rule["threshold"],
-            })
+            checks.append(
+                {
+                    "rule_id": rule["id"],
+                    "rule_name": rule["name"],
+                    "pipeline_id": rule["pipeline_id"],
+                    "target_table": rule["target_table"],
+                    "check_type": rule["check_type"],
+                    "severity": rule["severity"],
+                    "check_time": day.replace(
+                        hour=5, minute=random.randint(0, 59)
+                    ).isoformat(),
+                    "passed": passed,
+                    "violation_ratio": value,
+                    "threshold": rule["threshold"],
+                }
+            )
     checks.sort(key=lambda x: x["check_time"], reverse=True)
     return checks
 
@@ -166,28 +198,32 @@ def _generate_alerts(executions, quality_checks):
     alerts = []
     for ex in executions:
         if ex["status"] != "success":
-            alerts.append({
-                "id": f"ALT-{ex['id'][:8]}",
-                "type": "execution_failure",
-                "severity": "critical" if ex["status"] == "failed" else "warning",
-                "pipeline_id": ex["pipeline_id"],
-                "pipeline_name": ex["pipeline_name"],
-                "message": f"管道 [{ex['pipeline_name']}] 执行{ex['status']}, 耗时{ex['duration_minutes']}分钟",
-                "time": ex["end_time"],
-                "resolved": random.random() > 0.3,
-            })
+            alerts.append(
+                {
+                    "id": f"ALT-{ex['id'][:8]}",
+                    "type": "execution_failure",
+                    "severity": "critical" if ex["status"] == "failed" else "warning",
+                    "pipeline_id": ex["pipeline_id"],
+                    "pipeline_name": ex["pipeline_name"],
+                    "message": f"管道 [{ex['pipeline_name']}] 执行{ex['status']}, 耗时{ex['duration_minutes']}分钟",
+                    "time": ex["end_time"],
+                    "resolved": random.random() > 0.3,
+                }
+            )
     for qc in quality_checks:
         if not qc["passed"]:
-            alerts.append({
-                "id": f"ALT-Q-{qc['rule_id']}-{qc['check_time'][:10]}",
-                "type": "quality_violation",
-                "severity": qc["severity"],
-                "pipeline_id": qc["pipeline_id"],
-                "pipeline_name": qc["rule_name"],
-                "message": f"质量规则 [{qc['rule_name']}] 违反, 违规比率 {qc['violation_ratio']}",
-                "time": qc["check_time"],
-                "resolved": random.random() > 0.4,
-            })
+            alerts.append(
+                {
+                    "id": f"ALT-Q-{qc['rule_id']}-{qc['check_time'][:10]}",
+                    "type": "quality_violation",
+                    "severity": qc["severity"],
+                    "pipeline_id": qc["pipeline_id"],
+                    "pipeline_name": qc["rule_name"],
+                    "message": f"质量规则 [{qc['rule_name']}] 违反, 违规比率 {qc['violation_ratio']}",
+                    "time": qc["check_time"],
+                    "resolved": random.random() > 0.4,
+                }
+            )
     alerts.sort(key=lambda x: x["time"], reverse=True)
     return alerts
 
@@ -202,15 +238,21 @@ ALERTS = _generate_alerts(EXECUTIONS, QUALITY_CHECKS)
 # API 路由
 # ---------------------------------------------------------------------------
 
+
 @app.get("/api/dashboard/stats")
 def dashboard_stats():
     active_count = sum(1 for p in PIPELINES if p["status"] == "active")
-    total_execs_today = sum(1 for e in EXECUTIONS
-                           if e["start_time"][:10] == datetime.now().strftime("%Y-%m-%d"))
+    total_execs_today = sum(
+        1
+        for e in EXECUTIONS
+        if e["start_time"][:10] == datetime.now().strftime("%Y-%m-%d")
+    )
     # 使用最近一天有数据的日期
     if total_execs_today == 0:
         latest_date = EXECUTIONS[0]["start_time"][:10] if EXECUTIONS else ""
-        total_execs_today = sum(1 for e in EXECUTIONS if e["start_time"][:10] == latest_date)
+        total_execs_today = sum(
+            1 for e in EXECUTIONS if e["start_time"][:10] == latest_date
+        )
 
     failed_checks = sum(1 for qc in QUALITY_CHECKS[-200:] if not qc["passed"])
     total_checks = min(200, len(QUALITY_CHECKS))
@@ -244,12 +286,14 @@ def execution_trend():
     for day_offset in range(14, 0, -1):
         day_str = (now - timedelta(days=day_offset)).strftime("%Y-%m-%d")
         day_execs = [e for e in EXECUTIONS if e["start_time"][:10] == day_str]
-        trend.append({
-            "date": day_str,
-            "success": sum(1 for e in day_execs if e["status"] == "success"),
-            "failed": sum(1 for e in day_execs if e["status"] != "success"),
-            "total": len(day_execs),
-        })
+        trend.append(
+            {
+                "date": day_str,
+                "success": sum(1 for e in day_execs if e["status"] == "success"),
+                "failed": sum(1 for e in day_execs if e["status"] != "success"),
+                "total": len(day_execs),
+            }
+        )
     return trend
 
 
@@ -264,18 +308,22 @@ def list_pipelines():
     for p in PIPELINES:
         pid = p["id"]
         recent = [e for e in EXECUTIONS if e["pipeline_id"] == pid][:30]
-        success_rate = (sum(1 for e in recent if e["status"] == "success") / max(len(recent), 1)) * 100
+        success_rate = (
+            sum(1 for e in recent if e["status"] == "success") / max(len(recent), 1)
+        ) * 100
         avg_duration = sum(e["duration_minutes"] for e in recent) / max(len(recent), 1)
         total_cost = sum(e["cost_yuan"] for e in recent)
         last_exec = recent[0] if recent else None
-        result.append({
-            **p,
-            "success_rate_30d": round(success_rate, 1),
-            "avg_duration_30d": round(avg_duration, 1),
-            "total_cost_30d": round(total_cost, 2),
-            "last_execution": last_exec,
-            "team_name": TEAM_NAMES.get(p["owner"], p["owner"]),
-        })
+        result.append(
+            {
+                **p,
+                "success_rate_30d": round(success_rate, 1),
+                "avg_duration_30d": round(avg_duration, 1),
+                "total_cost_30d": round(total_cost, 2),
+                "last_execution": last_exec,
+                "team_name": TEAM_NAMES.get(p["owner"], p["owner"]),
+            }
+        )
     return result
 
 
@@ -284,8 +332,11 @@ def get_pipeline(pipeline_id: str):
     for p in PIPELINES:
         if p["id"] == pipeline_id:
             recent = [e for e in EXECUTIONS if e["pipeline_id"] == pipeline_id][:50]
-            return {**p, "recent_executions": recent,
-                    "team_name": TEAM_NAMES.get(p["owner"], p["owner"])}
+            return {
+                **p,
+                "recent_executions": recent,
+                "team_name": TEAM_NAMES.get(p["owner"], p["owner"]),
+            }
     return {"error": "not found"}
 
 
@@ -299,13 +350,17 @@ def list_quality_rules():
     result = []
     for r in QUALITY_RULES:
         recent_checks = [qc for qc in QUALITY_CHECKS if qc["rule_id"] == r["id"]][:30]
-        pass_rate = (sum(1 for qc in recent_checks if qc["passed"]) / max(len(recent_checks), 1)) * 100
-        result.append({
-            **r,
-            "pass_rate_30d": round(pass_rate, 1),
-            "total_checks_30d": len(recent_checks),
-            "recent_violations": sum(1 for qc in recent_checks if not qc["passed"]),
-        })
+        pass_rate = (
+            sum(1 for qc in recent_checks if qc["passed"]) / max(len(recent_checks), 1)
+        ) * 100
+        result.append(
+            {
+                **r,
+                "pass_rate_30d": round(pass_rate, 1),
+                "total_checks_30d": len(recent_checks),
+                "recent_violations": sum(1 for qc in recent_checks if not qc["passed"]),
+            }
+        )
     return result
 
 
@@ -323,7 +378,9 @@ def quality_score_trend():
         day_str = (now - timedelta(days=day_offset)).strftime("%Y-%m-%d")
         day_checks = [qc for qc in QUALITY_CHECKS if qc["check_time"][:10] == day_str]
         if day_checks:
-            score = round((sum(1 for qc in day_checks if qc["passed"]) / len(day_checks)) * 100, 1)
+            score = round(
+                (sum(1 for qc in day_checks if qc["passed"]) / len(day_checks)) * 100, 1
+            )
         else:
             score = 0
         trend.append({"date": day_str, "score": score, "checks": len(day_checks)})
@@ -336,14 +393,23 @@ def cost_summary():
     by_pipeline = {}
     for e in EXECUTIONS:
         pid = e["pipeline_id"]
-        by_pipeline.setdefault(pid, {"pipeline_id": pid, "pipeline_name": e["pipeline_name"],
-                                     "cost": 0, "runs": 0})
+        by_pipeline.setdefault(
+            pid,
+            {
+                "pipeline_id": pid,
+                "pipeline_name": e["pipeline_name"],
+                "cost": 0,
+                "runs": 0,
+            },
+        )
         by_pipeline[pid]["cost"] += e["cost_yuan"]
         by_pipeline[pid]["runs"] += 1
     for v in by_pipeline.values():
         v["cost"] = round(v["cost"], 2)
         v["avg_cost_per_run"] = round(v["cost"] / max(v["runs"], 1), 2)
-    sorted_pipelines = sorted(by_pipeline.values(), key=lambda x: x["cost"], reverse=True)
+    sorted_pipelines = sorted(
+        by_pipeline.values(), key=lambda x: x["cost"], reverse=True
+    )
     return {
         "total_cost_30d": round(total, 2),
         "avg_daily_cost": round(total / 30, 2),
@@ -357,7 +423,9 @@ def cost_trend():
     trend = []
     for day_offset in range(30, 0, -1):
         day_str = (now - timedelta(days=day_offset)).strftime("%Y-%m-%d")
-        day_cost = sum(e["cost_yuan"] for e in EXECUTIONS if e["start_time"][:10] == day_str)
+        day_cost = sum(
+            e["cost_yuan"] for e in EXECUTIONS if e["start_time"][:10] == day_str
+        )
         trend.append({"date": day_str, "cost": round(day_cost, 2)})
     return trend
 
@@ -368,16 +436,19 @@ def team_stats():
     teams = {}
     for p in PIPELINES:
         owner = p["owner"]
-        teams.setdefault(owner, {
-            "team_id": owner,
-            "team_name": TEAM_NAMES.get(owner, owner),
-            "pipeline_count": 0,
-            "active_count": 0,
-            "total_cost": 0.0,
-            "total_runs": 0,
-            "success_runs": 0,
-            "total_rows": 0,
-        })
+        teams.setdefault(
+            owner,
+            {
+                "team_id": owner,
+                "team_name": TEAM_NAMES.get(owner, owner),
+                "pipeline_count": 0,
+                "active_count": 0,
+                "total_cost": 0.0,
+                "total_runs": 0,
+                "success_runs": 0,
+                "total_rows": 0,
+            },
+        )
         teams[owner]["pipeline_count"] += 1
         if p["status"] == "active":
             teams[owner]["active_count"] += 1
@@ -395,12 +466,18 @@ def team_stats():
     for t in teams.values():
         t["total_cost"] = round(t["total_cost"], 2)
         t["success_rate"] = round(
-            (t["success_runs"] / max(t["total_runs"], 1)) * 100, 1)
+            (t["success_runs"] / max(t["total_runs"], 1)) * 100, 1
+        )
         # 质量评分: 该团队管道关联的质量规则通过率
         team_pipelines = [p["id"] for p in PIPELINES if p["owner"] == t["team_id"]]
-        team_checks = [qc for qc in QUALITY_CHECKS if qc["pipeline_id"] in team_pipelines][:100]
+        team_checks = [
+            qc for qc in QUALITY_CHECKS if qc["pipeline_id"] in team_pipelines
+        ][:100]
         t["quality_score"] = round(
-            (sum(1 for qc in team_checks if qc["passed"]) / max(len(team_checks), 1)) * 100, 1)
+            (sum(1 for qc in team_checks if qc["passed"]) / max(len(team_checks), 1))
+            * 100,
+            1,
+        )
         result.append(t)
 
     result.sort(key=lambda x: x["quality_score"], reverse=True)
@@ -417,17 +494,40 @@ def data_lineage():
         nodes.add(target)
         for src in p.get("source_tables", []):
             nodes.add(src)
-            edges.append({"source": src, "target": target, "pipeline": p["name"],
-                          "pipeline_id": p["id"], "status": p["status"]})
+            edges.append(
+                {
+                    "source": src,
+                    "target": target,
+                    "pipeline": p["name"],
+                    "pipeline_id": p["id"],
+                    "status": p["status"],
+                }
+            )
         for dep_id in p.get("dependencies", []):
             dep_pipe = next((pp for pp in PIPELINES if pp["id"] == dep_id), None)
             if dep_pipe:
-                edges.append({"source": dep_pipe["target_table"], "target": target,
-                              "pipeline": p["name"], "pipeline_id": p["id"],
-                              "status": p["status"], "is_dependency": True})
+                edges.append(
+                    {
+                        "source": dep_pipe["target_table"],
+                        "target": target,
+                        "pipeline": p["name"],
+                        "pipeline_id": p["id"],
+                        "status": p["status"],
+                        "is_dependency": True,
+                    }
+                )
     return {
-        "nodes": [{"id": n, "type": "ods" if n.startswith("ods_") else "dw" if n.startswith("dw_") else "dm"}
-                   for n in sorted(nodes)],
+        "nodes": [
+            {
+                "id": n,
+                "type": "ods"
+                if n.startswith("ods_")
+                else "dw"
+                if n.startswith("dw_")
+                else "dm",
+            }
+            for n in sorted(nodes)
+        ],
         "edges": edges,
     }
 
@@ -435,7 +535,16 @@ def data_lineage():
 @app.get("/api/config/reload")
 def reload_config():
     """热重载 YAML 配置"""
-    global PIPELINES, QUALITY_RULES, _pipelines_cfg, _quality_cfg, _annotation_cfg, ANNOTATION_TASKS, ANNOTATORS, QUALITY_CONFIG, ANNOTATION_SAMPLES
+    global \
+        PIPELINES, \
+        QUALITY_RULES, \
+        _pipelines_cfg, \
+        _quality_cfg, \
+        _annotation_cfg, \
+        ANNOTATION_TASKS, \
+        ANNOTATORS, \
+        QUALITY_CONFIG, \
+        ANNOTATION_SAMPLES
     _pipelines_cfg = _load_yaml("pipelines.yaml")
     _quality_cfg = _load_yaml("quality.yaml")
     _annotation_cfg = _load_yaml("annotation.yaml")
@@ -447,8 +556,13 @@ def reload_config():
     ANNOTATION_SAMPLES = {}
     for task_id, samples in _annotation_cfg.get("annotation_samples", {}).items():
         ANNOTATION_SAMPLES[task_id] = samples
-    return {"status": "ok", "pipelines": len(PIPELINES), "quality_rules": len(QUALITY_RULES),
-            "annotation_tasks": len(ANNOTATION_TASKS), "annotation_samples": sum(len(v) for v in ANNOTATION_SAMPLES.values())}
+    return {
+        "status": "ok",
+        "pipelines": len(PIPELINES),
+        "quality_rules": len(QUALITY_RULES),
+        "annotation_tasks": len(ANNOTATION_TASKS),
+        "annotation_samples": sum(len(v) for v in ANNOTATION_SAMPLES.values()),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -518,21 +632,26 @@ def list_annotation_tasks():
         pending = sum(1 for s in subs if s["review_status"] == "pending")
         avg_duration = sum(s["duration_seconds"] for s in subs) / max(len(subs), 1)
         sample_count = len(ANNOTATION_SAMPLES.get(tid, []))
-        result.append({
-            **t,
-            "type_label": TASK_TYPE_LABELS.get(t["task_type"], t["task_type"]),
-            "sample_count": sample_count,
-            "total_samples": sample_count,
-            "completed_samples": completed,
-            "progress_percent": round((completed / max(sample_count, 1)) * 100, 1),
-            "approved_count": approved,
-            "rejected_count": rejected,
-            "pending_review": pending,
-            "approval_rate": round(approved / max(approved + rejected, 1) * 100, 1),
-            "avg_duration_seconds": round(avg_duration),
-            "annotator_names": [a["name"] for a in ANNOTATORS
-                                if a["id"] in t.get("assigned_annotators", [])],
-        })
+        result.append(
+            {
+                **t,
+                "type_label": TASK_TYPE_LABELS.get(t["task_type"], t["task_type"]),
+                "sample_count": sample_count,
+                "total_samples": sample_count,
+                "completed_samples": completed,
+                "progress_percent": round((completed / max(sample_count, 1)) * 100, 1),
+                "approved_count": approved,
+                "rejected_count": rejected,
+                "pending_review": pending,
+                "approval_rate": round(approved / max(approved + rejected, 1) * 100, 1),
+                "avg_duration_seconds": round(avg_duration),
+                "annotator_names": [
+                    a["name"]
+                    for a in ANNOTATORS
+                    if a["id"] in t.get("assigned_annotators", [])
+                ],
+            }
+        )
     return result
 
 
@@ -542,9 +661,12 @@ def get_annotation_task(task_id: str):
         if t["id"] == task_id:
             subs = [s for s in ANNOTATION_SUBMISSIONS if s["task_id"] == task_id]
             sample_count = len(ANNOTATION_SAMPLES.get(task_id, []))
-            return {**t, "submissions": subs[:50],
-                    "sample_count": sample_count,
-                    "type_label": TASK_TYPE_LABELS.get(t["task_type"], t["task_type"])}
+            return {
+                **t,
+                "submissions": subs[:50],
+                "sample_count": sample_count,
+                "type_label": TASK_TYPE_LABELS.get(t["task_type"], t["task_type"]),
+            }
     return {"error": "not found"}
 
 
@@ -557,13 +679,21 @@ def get_task_samples(task_id: str, limit: int = 50):
     task_samples = ANNOTATION_SAMPLES.get(task_id, [])
     samples = []
     for sp in task_samples[:limit]:
-        existing_sub = next((s for s in ANNOTATION_SUBMISSIONS
-                             if s["task_id"] == task_id and s["sample_id"] == sp["id"]), None)
-        samples.append({
-            **sp,
-            "annotation": existing_sub,
-            "annotated": existing_sub is not None,
-        })
+        existing_sub = next(
+            (
+                s
+                for s in ANNOTATION_SUBMISSIONS
+                if s["task_id"] == task_id and s["sample_id"] == sp["id"]
+            ),
+            None,
+        )
+        samples.append(
+            {
+                **sp,
+                "annotation": existing_sub,
+                "annotated": existing_sub is not None,
+            }
+        )
     return {"samples": samples, "total": len(task_samples), "task_id": task_id}
 
 
@@ -584,8 +714,14 @@ async def submit_annotation(task_id: str, request: Request):
         return {"status": "error", "message": f"样本 {sample_id} 不存在"}
 
     # 检查是否重复提交
-    existing = next((s for s in ANNOTATION_SUBMISSIONS
-                     if s["task_id"] == task_id and s["sample_id"] == sample_id), None)
+    existing = next(
+        (
+            s
+            for s in ANNOTATION_SUBMISSIONS
+            if s["task_id"] == task_id and s["sample_id"] == sample_id
+        ),
+        None,
+    )
     if existing:
         return {"status": "error", "message": f"样本 {sample_id} 已被标注"}
 
@@ -628,7 +764,11 @@ async def submit_annotation(task_id: str, request: Request):
     elif task_type == "reward_scoring":
         sub["scores"] = body.get("scores", {})
         score_values = list(sub["scores"].values())
-        sub["overall_score"] = round(sum(score_values) / max(len(score_values), 1), 1) if score_values else 0
+        sub["overall_score"] = (
+            round(sum(score_values) / max(len(score_values), 1), 1)
+            if score_values
+            else 0
+        )
 
     ANNOTATION_SUBMISSIONS.append(sub)
 
@@ -684,9 +824,21 @@ def list_task_submissions(task_id: str, review_status: str = "all"):
     if review_status != "all":
         subs = [s for s in subs if s["review_status"] == review_status]
     by_status = {
-        "pending": sum(1 for s in ANNOTATION_SUBMISSIONS if s["task_id"] == task_id and s["review_status"] == "pending"),
-        "approved": sum(1 for s in ANNOTATION_SUBMISSIONS if s["task_id"] == task_id and s["review_status"] == "approved"),
-        "rejected": sum(1 for s in ANNOTATION_SUBMISSIONS if s["task_id"] == task_id and s["review_status"] == "rejected"),
+        "pending": sum(
+            1
+            for s in ANNOTATION_SUBMISSIONS
+            if s["task_id"] == task_id and s["review_status"] == "pending"
+        ),
+        "approved": sum(
+            1
+            for s in ANNOTATION_SUBMISSIONS
+            if s["task_id"] == task_id and s["review_status"] == "approved"
+        ),
+        "rejected": sum(
+            1
+            for s in ANNOTATION_SUBMISSIONS
+            if s["task_id"] == task_id and s["review_status"] == "rejected"
+        ),
     }
     return {"submissions": subs, "total": len(subs), "by_status": by_status}
 
@@ -701,16 +853,20 @@ def list_annotators():
         rejected = sum(1 for s in subs if s["review_status"] == "rejected")
         avg_speed = sum(s["duration_seconds"] for s in subs) / max(len(subs), 1)
         tasks_involved = len(set(s["task_id"] for s in subs))
-        result.append({
-            **a,
-            "total_submissions": len(subs),
-            "approved": approved,
-            "rejected": rejected,
-            "computed_accuracy": round(approved / max(approved + rejected, 1) * 100, 1),
-            "avg_speed_seconds": round(avg_speed),
-            "samples_per_hour": round(3600 / max(avg_speed, 1), 1),
-            "tasks_involved": tasks_involved,
-        })
+        result.append(
+            {
+                **a,
+                "total_submissions": len(subs),
+                "approved": approved,
+                "rejected": rejected,
+                "computed_accuracy": round(
+                    approved / max(approved + rejected, 1) * 100, 1
+                ),
+                "avg_speed_seconds": round(avg_speed),
+                "samples_per_hour": round(3600 / max(avg_speed, 1), 1),
+                "tasks_involved": tasks_involved,
+            }
+        )
     result.sort(key=lambda x: x["computed_accuracy"], reverse=True)
     return result
 
@@ -719,8 +875,12 @@ def list_annotators():
 def annotation_quality():
     """标注质量总览: 一致性、通过率、抽检结果"""
     total_subs = len(ANNOTATION_SUBMISSIONS)
-    approved = sum(1 for s in ANNOTATION_SUBMISSIONS if s["review_status"] == "approved")
-    rejected = sum(1 for s in ANNOTATION_SUBMISSIONS if s["review_status"] == "rejected")
+    approved = sum(
+        1 for s in ANNOTATION_SUBMISSIONS if s["review_status"] == "approved"
+    )
+    rejected = sum(
+        1 for s in ANNOTATION_SUBMISSIONS if s["review_status"] == "rejected"
+    )
     pending = sum(1 for s in ANNOTATION_SUBMISSIONS if s["review_status"] == "pending")
 
     by_task_type = {}
@@ -733,13 +893,15 @@ def annotation_quality():
         elif s["review_status"] == "rejected":
             by_task_type[tt]["rejected"] += 1
     for tt, v in by_task_type.items():
-        v["approval_rate"] = round(v["approved"] / max(v["approved"] + v["rejected"], 1) * 100, 1)
+        v["approval_rate"] = round(
+            v["approved"] / max(v["approved"] + v["rejected"], 1) * 100, 1
+        )
         v["type_label"] = TASK_TYPE_LABELS.get(tt, tt)
 
     # 基于真实审核率计算 kappa 近似值
     if total_subs > 0 and (approved + rejected) > 0:
         approval_rate = approved / (approved + rejected)
-        pe = approval_rate ** 2 + (1 - approval_rate) ** 2
+        pe = approval_rate**2 + (1 - approval_rate) ** 2
         po = approval_rate  # 近似观测一致率
         kappa = round((po - pe) / max(1 - pe, 0.001), 2)
         kappa = max(0, min(1, kappa))
@@ -753,7 +915,13 @@ def annotation_quality():
         "pending_review": pending,
         "overall_approval_rate": round(approved / max(approved + rejected, 1) * 100, 1),
         "fleiss_kappa": kappa,
-        "kappa_interpretation": "substantial" if kappa >= 0.61 else "moderate" if kappa >= 0.41 else "fair" if kappa >= 0.21 else "slight",
+        "kappa_interpretation": "substantial"
+        if kappa >= 0.61
+        else "moderate"
+        if kappa >= 0.41
+        else "fair"
+        if kappa >= 0.21
+        else "slight",
         "spot_check_ratio": QUALITY_CONFIG["spot_check_ratio"],
         "by_task_type": by_task_type,
         "quality_config": QUALITY_CONFIG,
@@ -769,13 +937,21 @@ def annotation_stats():
     daily_trend = []
     for day_offset in range(14, 0, -1):
         day_str = (now - timedelta(days=day_offset)).strftime("%Y-%m-%d")
-        day_subs = [s for s in ANNOTATION_SUBMISSIONS if s["submit_time"][:10] == day_str]
-        daily_trend.append({
-            "date": day_str,
-            "count": len(day_subs),
-            "approved": sum(1 for s in day_subs if s["review_status"] == "approved"),
-            "rejected": sum(1 for s in day_subs if s["review_status"] == "rejected"),
-        })
+        day_subs = [
+            s for s in ANNOTATION_SUBMISSIONS if s["submit_time"][:10] == day_str
+        ]
+        daily_trend.append(
+            {
+                "date": day_str,
+                "count": len(day_subs),
+                "approved": sum(
+                    1 for s in day_subs if s["review_status"] == "approved"
+                ),
+                "rejected": sum(
+                    1 for s in day_subs if s["review_status"] == "rejected"
+                ),
+            }
+        )
 
     # 按 domain 分布
     domain_dist = {}
@@ -783,8 +959,10 @@ def annotation_stats():
         d = s.get("domain", "unknown")
         domain_dist.setdefault(d, 0)
         domain_dist[d] += 1
-    domain_list = [{"domain": k, "count": v} for k, v in
-                   sorted(domain_dist.items(), key=lambda x: x[1], reverse=True)]
+    domain_list = [
+        {"domain": k, "count": v}
+        for k, v in sorted(domain_dist.items(), key=lambda x: x[1], reverse=True)
+    ]
 
     # 按 task_type 分布
     type_dist = {}
@@ -792,8 +970,10 @@ def annotation_stats():
         tt = s["task_type"]
         type_dist.setdefault(tt, 0)
         type_dist[tt] += 1
-    type_list = [{"task_type": k, "label": TASK_TYPE_LABELS.get(k, k), "count": v}
-                 for k, v in sorted(type_dist.items(), key=lambda x: x[1], reverse=True)]
+    type_list = [
+        {"task_type": k, "label": TASK_TYPE_LABELS.get(k, k), "count": v}
+        for k, v in sorted(type_dist.items(), key=lambda x: x[1], reverse=True)
+    ]
 
     # 难度分布 — 从 YAML 样本中查找
     difficulty_dist = {}
@@ -812,8 +992,11 @@ def annotation_stats():
             safety_dist[cat] += 1
 
     # SFT 编辑比率分布
-    sft_edit_ratios = [s["edit_ratio"] for s in ANNOTATION_SUBMISSIONS
-                       if s["task_type"] == "sft_editing" and "edit_ratio" in s]
+    sft_edit_ratios = [
+        s["edit_ratio"]
+        for s in ANNOTATION_SUBMISSIONS
+        if s["task_type"] == "sft_editing" and "edit_ratio" in s
+    ]
     avg_edit_ratio = round(sum(sft_edit_ratios) / max(len(sft_edit_ratios), 1), 3)
 
     # 总样本数 (来自 YAML)
@@ -829,9 +1012,24 @@ def annotation_stats():
         "total_annotated": len(ANNOTATION_SUBMISSIONS),
         "total_prompts": total_samples,
         "data_versions": [
-            {"version": "v1.0", "date": "2025-12-15", "samples": 320, "format": "jsonl"},
-            {"version": "v1.1", "date": "2026-01-05", "samples": 680, "format": "jsonl"},
-            {"version": "v1.2-draft", "date": "2026-01-25", "samples": len(ANNOTATION_SUBMISSIONS), "format": "jsonl"},
+            {
+                "version": "v1.0",
+                "date": "2025-12-15",
+                "samples": 320,
+                "format": "jsonl",
+            },
+            {
+                "version": "v1.1",
+                "date": "2026-01-05",
+                "samples": 680,
+                "format": "jsonl",
+            },
+            {
+                "version": "v1.2-draft",
+                "date": "2026-01-25",
+                "samples": len(ANNOTATION_SUBMISSIONS),
+                "format": "jsonl",
+            },
         ],
     }
 
@@ -839,8 +1037,11 @@ def annotation_stats():
 @app.get("/api/annotation/export/{task_id}")
 def export_annotation_data(task_id: str, format: str = "jsonl"):
     """导出标注数据 (返回已审核通过的数据)"""
-    subs = [s for s in ANNOTATION_SUBMISSIONS
-            if s["task_id"] == task_id and s["review_status"] == "approved"]
+    subs = [
+        s
+        for s in ANNOTATION_SUBMISSIONS
+        if s["task_id"] == task_id and s["review_status"] == "approved"
+    ]
     task = next((t for t in ANNOTATION_TASKS if t["id"] == task_id), None)
     if not task:
         return {"error": "task not found"}
@@ -898,7 +1099,7 @@ async def ai_chat(request: Request):
         async with httpx.AsyncClient(timeout=60.0) as client:
             async with client.stream(
                 "POST",
-                f"https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+                "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
                 headers={
                     "Authorization": f"Bearer {ARK_API_KEY}",
                     "Content-Type": "application/json",
@@ -921,4 +1122,5 @@ async def ai_chat(request: Request):
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
