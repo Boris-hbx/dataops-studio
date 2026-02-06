@@ -1,24 +1,18 @@
-import { useState, useEffect } from 'react'
 import { Card, Table, Typography, Row, Col, Statistic, Tag, Space } from 'antd'
 import { DollarOutlined, RiseOutlined, FallOutlined } from '@ant-design/icons'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
 } from 'recharts'
+import useApi from '../hooks/useApi'
 
 const { Title, Text } = Typography
 const COLORS = ['#1677ff', '#52c41a', '#722ed1', '#faad14', '#ff4d4f', '#13c2c2']
 
 export default function CostAnalysis() {
-  const [summary, setSummary] = useState(null)
-  const [trend, setTrend] = useState([])
-  const [teams, setTeams] = useState([])
-
-  useEffect(() => {
-    fetch('/api/cost/summary').then(r => r.json()).then(setSummary)
-    fetch('/api/cost/trend').then(r => r.json()).then(setTrend)
-    fetch('/api/teams/stats').then(r => r.json()).then(setTeams)
-  }, [])
+  const { data: summary } = useApi('/api/cost/summary')
+  const { data: trend } = useApi('/api/cost/trend', { defaultValue: [] })
+  const { data: teams } = useApi('/api/teams/stats', { defaultValue: [] })
 
   if (!summary) return null
 

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, Table, Tag, Typography, Space, Progress, Modal, Descriptions, Timeline } from 'antd'
 import {
   CheckCircleOutlined, CloseCircleOutlined, PauseCircleOutlined,
   WarningOutlined, ClockCircleOutlined,
 } from '@ant-design/icons'
+import useApi from '../hooks/useApi'
 
 const { Title, Text } = Typography
 
@@ -15,13 +16,9 @@ const statusConfig = {
 }
 
 export default function Pipelines() {
-  const [pipelines, setPipelines] = useState([])
+  const { data: pipelines } = useApi('/api/pipelines', { defaultValue: [] })
   const [detail, setDetail] = useState(null)
   const [executions, setExecutions] = useState([])
-
-  useEffect(() => {
-    fetch('/api/pipelines').then(r => r.json()).then(setPipelines)
-  }, [])
 
   const showDetail = async (record) => {
     const res = await fetch(`/api/pipelines/${record.id}/executions?limit=20`)
@@ -32,7 +29,7 @@ export default function Pipelines() {
 
   const columns = [
     {
-      title: '管道名称', dataIndex: 'name', key: 'name',
+      title: '管道名称', dataIndex: 'name', key: 'name', width: 180,
       render: (name, record) => (
         <Space direction="vertical" size={0}>
           <a onClick={() => showDetail(record)}>{name}</a>
@@ -98,7 +95,7 @@ export default function Pipelines() {
       render: tags => tags?.map(t => (
         <Tag key={t} color={
           t === 'sla-critical' ? 'red' : t === 'legacy-debt' ? 'orange' :
-          t === 'core' ? 'blue' : t === 'revenue' ? 'green' : 'default'
+          t === 'core' ? 'blue' : 'default'
         }>{t}</Tag>
       )),
     },
@@ -115,6 +112,7 @@ export default function Pipelines() {
           rowKey="id"
           size="middle"
           pagination={false}
+          scroll={{ x: 1200 }}
         />
       </Card>
 

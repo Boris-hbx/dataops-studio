@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import { Card, Table, Tag, Typography, Space, Row, Col, Statistic, Alert, Badge } from 'antd'
 import {
   CheckCircleOutlined, CloseCircleOutlined, WarningOutlined,
@@ -8,6 +7,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import useApi from '../hooks/useApi'
 
 const { Title, Text } = Typography
 
@@ -26,15 +26,9 @@ const checkTypeLabels = {
 }
 
 export default function QualityRules() {
-  const [rules, setRules] = useState([])
-  const [scoreTrend, setScoreTrend] = useState([])
-  const [checks, setChecks] = useState([])
-
-  useEffect(() => {
-    fetch('/api/quality/rules').then(r => r.json()).then(setRules)
-    fetch('/api/quality/score-trend').then(r => r.json()).then(setScoreTrend)
-    fetch('/api/quality/checks?limit=50').then(r => r.json()).then(setChecks)
-  }, [])
+  const { data: rules } = useApi('/api/quality/rules', { defaultValue: [] })
+  const { data: scoreTrend } = useApi('/api/quality/score-trend', { defaultValue: [] })
+  const { data: checks } = useApi('/api/quality/checks?limit=50', { defaultValue: [] })
 
   const enabledRules = rules.filter(r => r.enabled)
   const disabledRules = rules.filter(r => !r.enabled)
